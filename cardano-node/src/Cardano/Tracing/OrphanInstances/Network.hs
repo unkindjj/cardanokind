@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -16,6 +17,7 @@ import           Cardano.Prelude hiding (show)
 import           Prelude (String, show)
 
 import           Control.Monad.Class.MonadTime (DiffTime, Time (..))
+import qualified Data.Set as Set
 import           Data.Text (pack)
 
 import           Network.Mux (MuxTrace (..), WithMuxBearer (..))
@@ -33,6 +35,7 @@ import           Ouroboros.Network.BlockFetch.ClientState (TraceFetchClientState
                      TraceLabelPeer (..))
 import qualified Ouroboros.Network.BlockFetch.ClientState as BlockFetch
 import           Ouroboros.Network.BlockFetch.Decision (FetchDecision, FetchDecline (..))
+import           Ouroboros.Network.ConnectionId (ConnectionId (..))
 import           Ouroboros.Network.Codec (AnyMessageAndAgency (..))
 import           Ouroboros.Network.DeltaQ (GSV (..), PeerGSV (..))
 import           Ouroboros.Network.KeepAlive (TraceKeepAliveClient (..))
@@ -40,6 +43,11 @@ import qualified Ouroboros.Network.NodeToClient as NtC
 import           Ouroboros.Network.NodeToNode (ErrorPolicyTrace (..), TraceSendRecv (..),
                      WithAddr (..))
 import qualified Ouroboros.Network.NodeToNode as NtN
+import           Ouroboros.Network.PeerSelection.Governor
+                    (PeerSelectionState (..), PeerSelectionTargets (..),
+                     DebugPeerSelection (..))
+import qualified Ouroboros.Network.PeerSelection.KnownPeers as KnownPeers
+import qualified Ouroboros.Network.PeerSelection.EstablishedPeers as EstablishedPeers
 import           Ouroboros.Network.Protocol.BlockFetch.Type (BlockFetch, Message (..))
 import           Ouroboros.Network.Protocol.ChainSync.Type (ChainSync)
 import qualified Ouroboros.Network.Protocol.ChainSync.Type as ChainSync
@@ -55,6 +63,12 @@ import           Ouroboros.Network.Subscription (ConnectResult (..), DnsTrace (.
 import           Ouroboros.Network.TxSubmission.Inbound (TraceTxSubmissionInbound (..))
 import qualified Ouroboros.Network.TxSubmission.Inbound as TxSubmission.Inbound
 import           Ouroboros.Network.TxSubmission.Outbound (TraceTxSubmissionOutbound (..))
+import           Ouroboros.Network.Diffusion (TraceLocalRootPeers, TracePublicRootPeers,
+                   TracePeerSelection (..), PeerSelectionActionsTrace (..),
+                   ConnectionManagerTrace (..), ConnectionHandlerTrace (..))
+import           Ouroboros.Network.ConnectionManager.Server (ServerTrace)
+import qualified Ouroboros.Network.ConnectionManager.Server as Server
+import           Ouroboros.Network.RethrowPolicy (ErrorCommand (..))
 
 {- HLINT ignore "Use record patterns" -}
 
@@ -87,7 +101,7 @@ instance HasSeverityAnnotation (TraceFetchClientState header) where
   getSeverityAnnotation BlockFetch.CompletedBlockFetch {} = Info
   getSeverityAnnotation BlockFetch.CompletedFetchBatch {} = Info
   getSeverityAnnotation BlockFetch.RejectedFetchBatch {} = Info
-  getSeverityAnnotation BlockFetch.ClientTerminated {} = Notice
+  getSeverityAnnotation BlockFetch.ClientTerminating {} = Notice
 
 
 instance HasPrivacyAnnotation (TraceSendRecv a)
@@ -125,8 +139,9 @@ instance HasSeverityAnnotation [TraceLabelPeer peer (FetchDecision [Point header
 
 instance HasPrivacyAnnotation (TraceTxSubmissionInbound txid tx)
 instance HasSeverityAnnotation (TraceTxSubmissionInbound txid tx) where
-  getSeverityAnnotation TxSubmission.Inbound.ServerTerminated = Notice
-  getSeverityAnnotation TxSubmission.Inbound.ClientTerminated = Notice
+  getSeverityAnnotation TxSubmission.Inbound.TxInboundTerminated = Notice
+  getSeverityAnnotation TxSubmission.Inbound.TxInboundCannotRequestMoreTxs {} = Debug
+  getSeverityAnnotation TxSubmission.Inbound.TxInboundCanRequestMoreTxs {} = Debug
 
 
 instance HasPrivacyAnnotation (TraceTxSubmissionOutbound txid tx)
@@ -288,10 +303,99 @@ instance HasSeverityAnnotation (WithMuxBearer peer MuxTrace) where
     MuxTraceRecvDeltaQSample {} -> Debug
     MuxTraceSDUReadTimeoutException -> Notice
     MuxTraceSDUWriteTimeoutException -> Notice
-    MuxTraceStartEagerly _ _ -> Debug
-    MuxTraceStartOnDemand _ _ -> Debug
-    MuxTraceStartedOnDemand _ _ -> Debug
+    MuxTraceStartEagerly _ _ -> Info
+    MuxTraceStartOnDemand _ _ -> Info
+    MuxTraceStartedOnDemand _ _ -> Info
     MuxTraceShutdown -> Debug
+
+instance HasPrivacyAnnotation TraceLocalRootPeers
+instance HasSeverityAnnotation TraceLocalRootPeers where
+  getSeverityAnnotation _ = Info
+
+instance HasPrivacyAnnotation TracePublicRootPeers
+instance HasSeverityAnnotation TracePublicRootPeers where
+  getSeverityAnnotation _ = Info
+
+instance HasPrivacyAnnotation (TracePeerSelection addr)
+instance HasSeverityAnnotation (TracePeerSelection addr) where
+  getSeverityAnnotation ev =
+    case ev of
+      TraceLocalRootPeersChanged {} -> Notice
+      TraceTargetsChanged        {} -> Notice
+      TracePublicRootsRequest    {} -> Info
+      TracePublicRootsResults    {} -> Info
+      TracePublicRootsFailure    {} -> Error
+      TraceGossipRequests        {} -> Debug
+      TraceGossipResults         {} -> Debug
+      TraceForgetColdPeers       {} -> Info
+      TracePromoteColdPeers      {} -> Info
+      TracePromoteColdFailed     {} -> Error
+      TracePromoteColdDone       {} -> Info
+      TracePromoteWarmPeers      {} -> Info
+      TracePromoteWarmFailed     {} -> Error
+      TracePromoteWarmDone       {} -> Info
+      TraceDemoteWarmPeers       {} -> Info
+      TraceDemoteWarmFailed      {} -> Error
+      TraceDemoteWarmDone        {} -> Info
+      TraceDemoteHotPeers        {} -> Info
+      TraceDemoteHotFailed       {} -> Error
+      TraceDemoteHotDone         {} -> Info
+      TraceDemoteAsynchronous    {} -> Info
+      TraceGovernorWakeup        {} -> Info
+
+instance HasPrivacyAnnotation (DebugPeerSelection addr conn)
+instance HasSeverityAnnotation (DebugPeerSelection addr conn) where
+  getSeverityAnnotation _ = Debug
+
+instance HasPrivacyAnnotation (PeerSelectionActionsTrace Socket.SockAddr)
+instance HasSeverityAnnotation (PeerSelectionActionsTrace Socket.SockAddr) where
+  getSeverityAnnotation ev =
+   case ev of
+     PeerStatusChanged {}       -> Info
+     PeerStatusChangeFailure {} -> Error
+     PeerMonitoringError {}     -> Error
+     PeerMonitoringResult {}    -> Debug
+
+instance HasPrivacyAnnotation (ConnectionManagerTrace addr connTrace)
+instance HasSeverityAnnotation (ConnectionManagerTrace addr (ConnectionHandlerTrace versionNumber agreedOptions)) where
+  getSeverityAnnotation ev =
+    case ev of
+      TrIncludedConnection {}   -> Debug
+      TrNegotiatedConnection {} -> Info
+      TrConnect {}              -> Debug
+      TrConnectError {}         -> Warning
+      TrReusedConnection {}     -> Info
+      TrConnectionFinished {}   -> Debug
+      TrConnectionHandler _ ev' ->
+        case ev' of
+          TrHandshakeSuccess {}     -> Info
+          TrHandshakeClientError {} -> Error
+          TrHandshakeServerError {} -> Info
+          TrError ShutdownNode _ _  -> Critical
+          TrError ShutdownPeer _ _  -> Info
+      TrShutdown -> Info
+
+      TrConnectionExists {}     -> Info
+      TrForbiddenConnection {}  -> Info
+      TrImpossibleConnection {} -> Info
+      TrConnectionFailure {}    -> Info
+      TrConnectionNotFound {}   -> Debug
+
+instance HasPrivacyAnnotation (ServerTrace addr versionNumber)
+instance HasSeverityAnnotation (ServerTrace addr versionNumber) where
+  getSeverityAnnotation ev =
+    case ev of
+      Server.AcceptConnection {}                    -> Debug
+      Server.StartRespondersOnInboundConncetion {}  -> Debug
+      Server.StartRespondersOnOutboundConnection {} -> Notice -- should be Info
+      Server.AcceptError {}                         -> Error
+      Server.AcceptPolicyTrace {}                   -> Notice
+      Server.Started {}                             -> Notice
+      Server.Stopped {}                             -> Notice
+      Server.MiniProtocolRestarted {}               -> Notice -- should be Info
+      Server.MiniProtocolError {}                   -> Error
+      Server.ControlMessage {}                      -> Debug
+      Server.Debug {}                               -> Debug
 
 --
 -- | instances of @Transformable@
@@ -343,10 +447,11 @@ instance HasTextFormatter (TraceTxSubmissionOutbound txid tx) where
   formatText _ = pack . show . toList
 
 
-instance Show remotePeer => Transformable Text IO (TraceKeepAliveClient remotePeer) where
+instance Show addr
+    => Transformable Text IO (TraceKeepAliveClient addr) where
   trTransformer = trStructuredText
-instance HasTextFormatter (TraceKeepAliveClient peer) where
-  formatText _ = pack . show . toList
+instance HasTextFormatter (TraceKeepAliveClient addr) where
+    formatText _ = pack . show . toList
 
 
 instance Show addr => Transformable Text IO (WithAddr addr ErrorPolicyTrace) where
@@ -373,7 +478,7 @@ instance HasTextFormatter (WithIPList (SubscriptionTrace Socket.SockAddr)) where
   formatText _ = pack . show . toList
 
 
-instance (Show peer)
+instance (Show peer, ToObject peer)
       => Transformable Text IO (WithMuxBearer peer MuxTrace) where
   trTransformer = trStructuredText
 instance (Show peer)
@@ -382,6 +487,51 @@ instance (Show peer)
     "Bearer on " <> pack (show peer)
    <> " event: " <> pack (show ev)
 
+
+instance Transformable Text IO TraceLocalRootPeers where
+  trTransformer = trStructuredText
+instance HasTextFormatter TraceLocalRootPeers where
+    formatText _ = pack . show . toList
+
+instance Transformable Text IO TracePublicRootPeers where
+  trTransformer = trStructuredText
+instance HasTextFormatter TracePublicRootPeers where
+  formatText _ = pack . show . toList
+
+instance Transformable Text IO (TracePeerSelection Socket.SockAddr) where
+  trTransformer = trStructuredText
+instance HasTextFormatter (TracePeerSelection Socket.SockAddr) where
+  formatText _ = pack . show . toList
+
+instance Show conn
+      => Transformable Text IO (DebugPeerSelection Socket.SockAddr conn) where
+  trTransformer = trStructuredText
+instance HasTextFormatter (DebugPeerSelection Socket.SockAddr conn) where
+  -- One can only change what is logged with respect to verbosity using json
+  -- format.
+  formatText _ obj = pack (show obj)
+
+instance Transformable Text IO (PeerSelectionActionsTrace Socket.SockAddr) where
+  trTransformer = trStructuredText
+instance HasTextFormatter (PeerSelectionActionsTrace Socket.SockAddr) where
+  formatText _ = pack . show . toList
+
+instance (Show addr, Show versionNumber, Show agreedOptions, ToObject addr)
+      => Transformable Text IO (ConnectionManagerTrace
+                                 addr
+                                 (ConnectionHandlerTrace versionNumber agreedOptions)) where
+  trTransformer = trStructuredText
+instance (Show addr, Show versionNumber, Show agreedOptions)
+      => HasTextFormatter (ConnectionManagerTrace
+                            addr
+                            (ConnectionHandlerTrace versionNumber agreedOptions)) where
+  formatText a _ = pack (show a)
+
+instance (Show addr, Show versionNumber)
+      => Transformable Text IO (ServerTrace addr versionNumber) where
+  trTransformer = trStructuredText
+instance HasTextFormatter (ServerTrace addr versionNumber) where
+  formatText _ = pack . show . toList
 
 --
 -- | instances of @ToObject@
@@ -518,6 +668,14 @@ instance ToObject (AnyMessageAndAgency (ChainSync blk tip)) where
               , "agency" .= String (pack $ show stok)
               ]
 
+
+instance Show peerAddr => ToObject (ConnectionId peerAddr) where
+    toObject _verb ConnectionId { localAddress, remoteAddress } =
+      mkObject [ "localAddress"  .= show localAddress
+               , "remoteAddress" .= show remoteAddress
+               ]
+
+
 instance ToObject (FetchDecision [Point header]) where
   toObject _verb (Left decline) =
     mkObject [ "kind" .= String "FetchDecision declined"
@@ -541,6 +699,11 @@ instance ToObject NtN.HandshakeTr where
     mkObject [ "kind" .= String "HandshakeTrace"
              , "bearer" .= show b
              , "event" .= show ev ]
+
+
+instance ToObject LocalAddress where
+    toObject _verb (LocalAddress path) =
+      mkObject [ "path" .= String (pack path) ]
 
 
 instance ToObject NtN.AcceptConnectionsPolicyTrace where
@@ -624,8 +787,10 @@ instance ToObject (TraceFetchClientState header) where
     mkObject [ "kind" .= String "StartedFetchBatch" ]
   toObject _verb BlockFetch.RejectedFetchBatch {} =
     mkObject [ "kind" .= String "RejectedFetchBatch" ]
-  toObject _verb BlockFetch.ClientTerminating {} =
-    mkObject [ "kind" .= String "ClientTerminating" ]
+  toObject _verb (BlockFetch.ClientTerminating outstanding) =
+    mkObject [ "kind" .= String "ClientTerminating"
+             , "outstanding" .= outstanding
+             ]
 
 
 instance Show peer
@@ -652,10 +817,22 @@ instance ToObject (AnyMessageAndAgency ps)
 
 
 instance ToObject (TraceTxSubmissionInbound txid tx) where
-  toObject _verb TxSubmission.Inbound.ClientTerminated =
-    mkObject [ "kind" .= String "ClientTerminated" ]
-  toObject _verb TxSubmission.Inbound.ServerTerminated =
-    mkObject [ "kind" .= String "ServerTerminated" ]
+  toObject _verb TxSubmission.Inbound.TxInboundTerminated =
+    mkObject [ "kind" .= String "TxInboundTerminated" ]
+  toObject _verb (TxSubmission.Inbound.TxInboundCanRequestMoreTxs n) =
+    mkObject [ "kind" .= String "TxInboundCanRequestMoreTxs"
+             , "pipelined" .= n
+             ]
+  toObject _verb (TxSubmission.Inbound.TxInboundCannotRequestMoreTxs n) =
+    mkObject [ "kind" .= String "TxInboundCannotRequestMoreTxs"
+             , "pipelined" .= n
+             ]
+
+
+-- TODO: ouroboros-network should provide a newtype wrapper for 'SockAddr'.
+instance ToObject Socket.SockAddr where
+    toObject _verb sockAddr =
+      mkObject [ "sockAddr" .= String (pack $ show sockAddr) ]
 
 
 instance (Show txid, Show tx)
@@ -678,9 +855,10 @@ instance (Show txid, Show tx)
     mkObject
       [ "kind" .= String "TraceTxSubmissionOutboundSendMsgReplyTxs"
       ]
-  toObject _verb (TraceControlMessage _msg) =
+  toObject _verb (TraceControlMessage controlMessage) =
     mkObject
       [ "kind" .= String "TraceControlMessage"
+      , "controlMessage" .= String (pack $ show controlMessage)
       ]
 
 
@@ -730,8 +908,159 @@ instance ToObject (WithDomainName (SubscriptionTrace Socket.SockAddr)) where
              , "event" .= show ev ]
 
 
-instance (Show peer) => ToObject (WithMuxBearer peer MuxTrace) where
-  toObject _verb (WithMuxBearer b ev) =
+instance (ToObject peer) => ToObject (WithMuxBearer peer MuxTrace) where
+  toObject verb (WithMuxBearer b ev) =
     mkObject [ "kind" .= String "MuxTrace"
-             , "bearer" .= show b
+             , "bearer" .= toObject verb b
+             , "event" .= show ev ]
+
+instance ToObject TraceLocalRootPeers where
+  toObject _verb ev =
+    mkObject [ "kind" .= String "TraceLocalRootPeers"
+             , "event" .= show ev ]
+
+instance ToObject TracePublicRootPeers where
+  toObject _verb ev =
+    mkObject [ "kind" .= String "TracePublicRootPeers"
+             , "event" .= show ev ]
+
+instance ToObject (TracePeerSelection Socket.SockAddr) where
+  toObject _verb ev =
+    mkObject [ "kind" .= String "TracePeerSelection"
+             , "event" .= show ev ]
+
+
+peerSelectionTargetsToObject :: PeerSelectionTargets -> Value
+peerSelectionTargetsToObject
+  PeerSelectionTargets { targetNumberOfRootPeers,
+                         targetNumberOfKnownPeers,
+                         targetNumberOfEstablishedPeers,
+                         targetNumberOfActivePeers } =
+    Object $
+      mkObject [ "roots" .= targetNumberOfRootPeers
+               , "knownPeers" .= targetNumberOfKnownPeers
+               , "established" .= targetNumberOfEstablishedPeers
+               , "active" .= targetNumberOfActivePeers
+               ]
+
+instance Show peerConn => ToObject (DebugPeerSelection Socket.SockAddr peerConn) where
+  toObject verb (TraceGovernorState blockedAt wakeupAfter
+                   PeerSelectionState { targets, knownPeers, establishedPeers, activePeers })
+      | verb <= NormalVerbosity =
+    mkObject [ "kind" .= String "DebugPeerSelection"
+             , "blockedAt" .= String (pack $ show blockedAt)
+             , "wakeupAfter" .= String (pack $ show wakeupAfter)
+             , "targets" .= peerSelectionTargetsToObject targets
+             , "numberOfPeers" .=
+                 Object (mkObject [ "known" .= KnownPeers.size knownPeers
+                                  , "established" .= EstablishedPeers.size establishedPeers
+                                  , "active" .= Set.size activePeers
+                                  ])
+             ]
+  toObject _ (TraceGovernorState blockedAt wakeupAfter ev) =
+    mkObject [ "kind" .= String "DebugPeerSelection"
+             , "blockedAt" .= String (pack $ show blockedAt)
+             , "wakeupAfter" .= String (pack $ show wakeupAfter)
+             , "peerSelectionState" .= String (pack $ show ev)
+             ]
+
+instance ToObject (PeerSelectionActionsTrace Socket.SockAddr) where
+  toObject _verb ev =
+    mkObject [ "kind" .= String "PeerSelectionAction"
+             , "event" .= show ev ]
+
+instance (Show addr, Show versionNumber, Show agreedOptions, ToObject addr)
+      => ToObject (ConnectionManagerTrace addr (ConnectionHandlerTrace versionNumber agreedOptions)) where
+  toObject verb ev =
+    case ev of
+      TrIncludedConnection connId prov ->
+        mkObject $ reverse $
+          [ "kind" .= String "IncludedConnection"
+          , "connectionId" .= toObject verb connId
+          , "provenance" .= String (pack . show $ prov)
+          ]
+      TrNegotiatedConnection connId prov dataFlow ->
+        mkObject
+          [ "kind" .= String "NegotiatedConnection"
+          , "connectionId" .= toObject verb connId
+          , "provenance" .= String (pack . show $ prov)
+          , "dataFlow" .= String (pack . show $ dataFlow)
+          ]
+      TrConnect (Just localAddress) remoteAddress ->
+        mkObject
+          [ "kind" .= String "ConnectTo"
+          , "connectionId" .= toObject verb ConnectionId { localAddress, remoteAddress }
+          ]
+      TrConnect Nothing remoteAddress ->
+        mkObject
+          [ "kind" .= String "ConnectTo"
+          , "remoteAddress" .= String (pack .show $ remoteAddress)
+          ]
+      TrConnectError (Just localAddress) remoteAddress err ->
+        mkObject
+          [ "king" .= String "ConnectError"
+          , "connectionId" .= toObject verb ConnectionId { localAddress, remoteAddress }
+          , "error" .= String (pack . show $ err)
+          ]
+      TrConnectError Nothing remoteAddress err ->
+        mkObject
+          [ "king" .= String "ConnectError"
+          , "remoteAddress" .= String (pack . show $ remoteAddress)
+          , "error" .= String (pack . show $ err)
+          ]
+      TrReusedConnection remoteAddress ->
+        mkObject
+          [ "kind" .= String "ReusedConnection"
+          , "remoteAddress" .= String (pack . show $ remoteAddress)
+          ]
+      TrConnectionFinished connId prov ->
+        mkObject
+          [ "kind" .= String "ConnectionFinished"
+          , "connectionId" .= toObject verb connId
+          , "provenance" .= String (pack . show $ prov)
+          ]
+      TrConnectionHandler connId a ->
+        mkObject
+          [ "kind" .= String "ConnectionHandler"
+          , "connectionId" .= toObject verb connId
+          -- TODO:  encode 'ConnectionHandlerTrace'
+          , "connectionHandler" .= String (pack . show $ a)
+          ]
+      TrShutdown ->
+        mkObject
+          [ "kind" .= String "ShutdownConnectionManager"
+          ]
+      TrConnectionExists connId prov ->
+        mkObject
+          [ "kind" .= String "ConnectionExists"
+          , "connectionId" .= toObject verb connId
+          , "provenance" .= String (pack . show $ prov)
+          ]
+      TrForbiddenConnection connId ->
+        mkObject
+          [ "kind" .= String "ForbiddenConnection"
+          , "connectionId" .= toObject verb connId
+          ]
+      TrImpossibleConnection connId ->
+        mkObject
+          [ "kind" .= String "ImpossibleConnection"
+          , "connectionId" .= toObject verb connId
+          ]
+      TrConnectionFailure connId ->
+        mkObject
+          [ "kind" .= String "ConnectionFailure"
+          , "connectionId" .= toObject verb connId
+          ]
+      TrConnectionNotFound remoteAddress dir ->
+        mkObject
+          [ "kind" .= String "ConnectionNotFound"
+          , "remoteAddress" .= String (pack . show $ remoteAddress)
+          , "direction" .= String (pack . show $ dir)
+          ]
+
+instance (Show addr, Show versionNumber)
+      => ToObject (ServerTrace addr versionNumber) where
+  -- TODO: a better 'ToObject' instance
+  toObject _verb ev =
+    mkObject [ "kind" .= String "ServerTrace"
              , "event" .= show ev ]
