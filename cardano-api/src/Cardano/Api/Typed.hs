@@ -252,6 +252,7 @@ module Cardano.Api.Typed (
     -- *** Local state query
     LocalStateQueryClient(..),
     queryNodeLocalState,
+    queryNodeLocalState',
 
     -- * Node operation
     -- | Support for the steps needed to operate a node, including the
@@ -370,7 +371,7 @@ import qualified Cardano.Prelude as CBOR (cborError)
 import qualified Shelley.Spec.Ledger.Serialization as CBOR (CBORGroup (..), decodeNullMaybe,
                      encodeNullMaybe)
 
-import           Cardano.Slotting.Slot (EpochNo, SlotNo)
+import           Cardano.Slotting.Slot (EpochNo, EpochSize (..), SlotNo)
 
 -- TODO: it'd be nice if the network imports needed were a bit more coherent
 import           Ouroboros.Network.Block (Point, Tip)
@@ -385,7 +386,10 @@ import           Ouroboros.Network.Util.ShowProxy (ShowProxy)
 
 -- TODO: it'd be nice if the consensus imports needed were a bit more coherent
 import           Ouroboros.Consensus.Block (BlockProtocol)
+import           Ouroboros.Consensus.BlockchainTime.WallClock.Types (SlotLength)
 import           Ouroboros.Consensus.Cardano (ProtocolClient, SecurityParam, protocolClientInfo)
+import           Ouroboros.Consensus.HardFork.Combinator.Compat (HardForkCompatQuery,
+                     forwardCompatQuery, singleEraCompatQuery)
 import           Ouroboros.Consensus.Ledger.Abstract (Query)
 import           Ouroboros.Consensus.Ledger.SupportsMempool (ApplyTxErr, GenTx)
 import           Ouroboros.Consensus.Network.NodeToClient (Codecs' (..), clientCodecs)
@@ -425,7 +429,7 @@ import qualified Cardano.Chain.UTxO as Byron
 --
 -- Shelley imports
 --
-import           Ouroboros.Consensus.Shelley.Protocol.Crypto (StandardShelley, StandardCrypto)
+import           Ouroboros.Consensus.Shelley.Protocol.Crypto (StandardCrypto, StandardShelley)
 
 import qualified Cardano.Ledger.Crypto as Shelley (DSIGN, KES, VRF)
 
@@ -2704,6 +2708,42 @@ queryNodeLocalState connctInfo pointAndQuery = do
             atomically $ putTMVar resultVar (Left failure)
             pure $ StateQuery.SendMsgDone ()
         }
+
+
+-- | Establish a connection to a node and execute a single hardfork compatible query using the
+-- local state query protocol.
+--
+queryNodeLocalState' :: forall mode block result.
+                         (ShowProxy block, ShowProxy (ApplyTxErr block),
+                          ShowProxy (Query block), ShowProxy (GenTx block))
+                      => LocalNodeConnectInfo mode block
+                      -> (Point block, HardForkCompatQuery block result)
+                      -> IO (Either AcquireFailure result)
+queryNodeLocalState' connctInfo (point, query) = runExceptT $
+    case localNodeConsensusMode connctInfo of
+      ByronMode (Byron.EpochSlots eSize) _ ->
+        singleEraCompatQuery
+          (EpochSize eSize)
+          slotLengthByron
+          runQuery
+          query
+      ShelleyMode {} ->
+        singleEraCompatQuery
+          epochSizeShelley
+          slotLengthShelley
+          runQuery
+          query
+      CardanoMode {} ->
+        forwardCompatQuery
+           runQuery
+           query
+  where
+    epochSizeShelley :: EpochSize
+    epochSizeShelley = undefined
+    slotLengthByron, slotLengthShelley :: SlotLength
+    (slotLengthByron, slotLengthShelley) = (undefined, undefined)
+    runQuery :: Query block a -> ExceptT AcquireFailure IO a
+    runQuery q = ExceptT (queryNodeLocalState connctInfo (point, q))
 
 submitTxToNodeLocal :: forall mode block.
                        (ShowProxy block, ShowProxy (ApplyTxErr block),

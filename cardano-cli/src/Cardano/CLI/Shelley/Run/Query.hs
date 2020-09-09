@@ -48,6 +48,8 @@ import           Cardano.Binary (decodeFull)
 import           Cardano.Crypto.Hash (hashToBytesAsHex)
 
 import           Ouroboros.Consensus.Cardano.Block (Either (..), EraMismatch (..), Query (..))
+import           Ouroboros.Consensus.HardFork.Combinator.Compat (compatGetInterpreter,
+                     singleEraCompatQuery)
 import           Ouroboros.Consensus.HardFork.Combinator.Degenerate (Either (DegenQueryResult),
                      Query (DegenQuery))
 import           Ouroboros.Consensus.Shelley.Protocol.Crypto (StandardShelley)
@@ -141,6 +143,13 @@ runQueryTip protocol network mOutFile = do
                        ShelleyMode{} -> encodePretty tip
                        CardanoMode{} -> encodePretty tip
         return output
+    _ <- firstExceptT ShelleyQueryCmdLocalStateQueryError $
+           withlocalNodeConnectInfo protocol network sockPath $ \connectInfo -> do
+             tip <- liftIO $ getLocalTip connectInfo
+             firstExceptT AcquireFailureError . newExceptT
+               $ queryNodeLocalState connectInfo
+                 (getTipPoint tip, (panic ""))
+-- singleEraCompatQuery (panic "") (panic "") (panic "") compatGetInterpreter
     case mOutFile of
       Just (OutputFile fpath) -> liftIO $ LBS.writeFile fpath output
       Nothing                 -> liftIO $ LBS.putStrLn        output
