@@ -21,6 +21,7 @@ $ cabal test cardano-node-chairman --test-show-details=direct
 # Design considerations
 
 * Cross-platform (Linux, MacOS, Windows)
+* Build system portable (nix, cabal)
 * Easy to debug (locally, in CI)
 * Test isolation (locally between tests, multiple runs in CI)
 
@@ -37,6 +38,10 @@ $ cabal test cardano-node-chairman --test-show-details=direct
 * Deadline assertions
 * Annotate on cleanup (not yet available; https://github.com/hedgehogqa/haskell-hedgehog/issues/399)
 * Resource cleanup (see Integration/propertyOnce)
-* 
-
+* Annotations in all the functions
+* Launching executables with the right binary
+  * Working across nix/straight cabal
+  * cabal exec (not good, dirty output, triggers configure)
+  * plan.json
+  * environment variable
 
