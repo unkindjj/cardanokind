@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Hedgehog.Extras.Test.Base
   ( propertyOnce
@@ -26,6 +27,13 @@ module Hedgehog.Extras.Test.Base
   , noteEachM_
   , noteEachIO
   , noteEachIO_
+
+  , noteShowEach
+  , noteShowEach_
+  , noteShowEachM
+  , noteShowEachM_
+  , noteShowEachIO
+  , noteShowEachIO_
 
   , noteTempFile
 
@@ -170,77 +178,113 @@ noteIO_ f = GHC.withFrozenCallStack $ do
   return ()
 
 -- | Annotate the given value.
-noteShow :: (MonadTest m, HasCallStack, Show a) => a -> m a
+noteShow :: forall a m. (MonadTest m, HasCallStack, Show a) => a -> m a
 noteShow a = GHC.withFrozenCallStack $ do
   !b <- H.eval a
   noteWithCallstack GHC.callStack (show b)
   return b
 
 -- | Annotate the given value returning unit.
-noteShow_ :: (MonadTest m, HasCallStack, Show a) => a -> m ()
+noteShow_ :: forall a m. (MonadTest m, HasCallStack, Show a) => a -> m ()
 noteShow_ a = GHC.withFrozenCallStack $ noteWithCallstack GHC.callStack (show a)
 
 -- | Annotate the given value in a monadic context.
-noteShowM :: (MonadTest m, MonadCatch m, HasCallStack, Show a) => m a -> m a
+noteShowM :: forall a m. (MonadTest m, MonadCatch m, HasCallStack, Show a) => m a -> m a
 noteShowM a = GHC.withFrozenCallStack $ do
   !b <- H.evalM a
   noteWithCallstack GHC.callStack (show b)
   return b
 
 -- | Annotate the given value in a monadic context returning unit.
-noteShowM_ :: (MonadTest m, MonadCatch m, HasCallStack, Show a) => m a -> m ()
+noteShowM_ :: forall a m. (MonadTest m, MonadCatch m, HasCallStack, Show a) => m a -> m ()
 noteShowM_ a = GHC.withFrozenCallStack $ do
   !b <- H.evalM a
   noteWithCallstack GHC.callStack (show b)
   return ()
 
 -- | Annotate the given value in IO.
-noteShowIO :: (MonadTest m, MonadIO m, HasCallStack, Show a) => IO a -> m a
+noteShowIO :: forall a m. (MonadTest m, MonadIO m, HasCallStack, Show a) => IO a -> m a
 noteShowIO f = GHC.withFrozenCallStack $ do
   !a <- H.evalIO f
   noteWithCallstack GHC.callStack (show a)
   return a
 
 -- | Annotate the given value in IO returning unit.
-noteShowIO_ :: (MonadTest m, MonadIO m, HasCallStack, Show a) => IO a -> m ()
+noteShowIO_ :: forall a m. (MonadTest m, MonadIO m, HasCallStack, Show a) => IO a -> m ()
 noteShowIO_ f = GHC.withFrozenCallStack $ do
   !a <- H.evalIO f
   noteWithCallstack GHC.callStack (show a)
   return ()
 
--- | Annotate the each value in the given traversable.
-noteEach :: (MonadTest m, HasCallStack, Show a, Traversable f) => f a -> m (f a)
+-- | Annotate each value in the given traversable.
+noteEach :: (MonadTest m, HasCallStack, Traversable f) => f String -> m (f String)
 noteEach as = GHC.withFrozenCallStack $ do
-  for_ as $ noteWithCallstack GHC.callStack . show
+  for_ as $ noteWithCallstack GHC.callStack
   return as
 
--- | Annotate the each value in the given traversable returning unit.
-noteEach_ :: (MonadTest m, HasCallStack, Show a, Traversable f) => f a -> m ()
-noteEach_ as = GHC.withFrozenCallStack $ for_ as $ noteWithCallstack GHC.callStack . show
+-- | Annotate each value in the given traversable returning unit.
+noteEach_ :: (MonadTest m, HasCallStack, Traversable f) => f String -> m ()
+noteEach_ as = GHC.withFrozenCallStack $ for_ as $ noteWithCallstack GHC.callStack
 
--- | Annotate the each value in the given traversable in a monadic context.
-noteEachM :: (MonadTest m, HasCallStack, Show a, Traversable f) => m (f a) -> m (f a)
+-- | Annotate each value in the given traversable in a monadic context.
+noteEachM :: (MonadTest m, HasCallStack, Traversable f) => m (f String) -> m (f String)
 noteEachM f = GHC.withFrozenCallStack $ do
   !as <- f
+  for_ as $ noteWithCallstack GHC.callStack
+  return as
+
+-- | Annotate each value in the given traversable in a monadic context returning unit.
+noteEachM_ :: (MonadTest m, HasCallStack, Traversable f) => m (f String) -> m ()
+noteEachM_ f = GHC.withFrozenCallStack $ do
+  !as <- f
+  for_ as $ noteWithCallstack GHC.callStack
+
+-- | Annotate each value in the given traversable in IO.
+noteEachIO :: (MonadTest m, MonadIO m, HasCallStack, Traversable f) => IO (f String) -> m (f String)
+noteEachIO f = GHC.withFrozenCallStack $ do
+  !as <- H.evalIO f
+  for_ as $ noteWithCallstack GHC.callStack
+  return as
+
+-- | Annotate each value in the given traversable in IO returning unit.
+noteEachIO_ :: (MonadTest m, MonadIO m, HasCallStack, Traversable f) => IO (f String) -> m ()
+noteEachIO_ f = GHC.withFrozenCallStack $ do
+  !as <- H.evalIO f
+  for_ as $ noteWithCallstack GHC.callStack
+
+-- | Annotate show each value in the given traversable.
+noteShowEach :: (MonadTest m, HasCallStack, Show a, Traversable f) => f a -> m (f a)
+noteShowEach as = GHC.withFrozenCallStack $ do
   for_ as $ noteWithCallstack GHC.callStack . show
   return as
 
--- | Annotate the each value in the given traversable in a monadic context returning unit.
-noteEachM_ :: (MonadTest m, HasCallStack, Show a, Traversable f) => m (f a) -> m ()
-noteEachM_ f = GHC.withFrozenCallStack $ do
+-- | Annotate show each value in the given traversable returning unit.
+noteShowEach_ :: (MonadTest m, HasCallStack, Show a, Traversable f) => f a -> m ()
+noteShowEach_ as = GHC.withFrozenCallStack $ for_ as $ noteWithCallstack GHC.callStack . show
+
+-- | Annotate show each value in the given traversable in a monadic context.
+noteShowEachM :: (MonadTest m, HasCallStack, Show a, Traversable f) => m (f a) -> m (f a)
+noteShowEachM f = GHC.withFrozenCallStack $ do
+  !as <- f
+  for_ as $ noteWithCallstack GHC.callStack . show
+  return as
+
+-- | Annotate show each value in the given traversable in a monadic context returning unit.
+noteShowEachM_ :: (MonadTest m, HasCallStack, Show a, Traversable f) => m (f a) -> m ()
+noteShowEachM_ f = GHC.withFrozenCallStack $ do
   !as <- f
   for_ as $ noteWithCallstack GHC.callStack . show
 
--- | Annotate the each value in the given traversable in IO.
-noteEachIO :: (MonadTest m, MonadIO m, HasCallStack, Show a, Traversable f) => IO (f a) -> m (f a)
-noteEachIO f = GHC.withFrozenCallStack $ do
+-- | Annotate show each value in the given traversable in IO.
+noteShowEachIO :: (MonadTest m, MonadIO m, HasCallStack, Show a, Traversable f) => IO (f a) -> m (f a)
+noteShowEachIO f = GHC.withFrozenCallStack $ do
   !as <- H.evalIO f
   for_ as $ noteWithCallstack GHC.callStack . show
   return as
 
--- | Annotate the each value in the given traversable in IO returning unit.
-noteEachIO_ :: (MonadTest m, MonadIO m, HasCallStack, Show a, Traversable f) => IO (f a) -> m ()
-noteEachIO_ f = GHC.withFrozenCallStack $ do
+-- | Annotate show each value in the given traversable in IO returning unit.
+noteShowEachIO_ :: (MonadTest m, MonadIO m, HasCallStack, Show a, Traversable f) => IO (f a) -> m ()
+noteShowEachIO_ f = GHC.withFrozenCallStack $ do
   !as <- H.evalIO f
   for_ as $ noteWithCallstack GHC.callStack . show
 

@@ -260,7 +260,7 @@ prop_chairman = H.propertyOnce . H.workspace "chairman" $ \tempAbsPath -> do
       ]
 
   -- Generated genesis keys and genesis files
-  H.noteEachM_ . H.listDirectory $ tempAbsPath </> "byron"
+  H.noteShowEachM_ . H.listDirectory $ tempAbsPath </> "byron"
 
   -- Set up our template
   H.createDirectoryIfMissing $ tempAbsPath </> "shelley"
@@ -294,7 +294,7 @@ prop_chairman = H.propertyOnce . H.workspace "chairman" $ \tempAbsPath -> do
     ]
 
   -- Generated genesis keys and genesis files
-  H.noteEachM_ . H.listDirectory $ tempAbsPath </> "shelley"
+  H.noteShowEachM_ . H.listDirectory $ tempAbsPath </> "shelley"
 
   -- Generated genesis.json
   H.cat $ tempAbsPath </> "shelley/genesis.json"
@@ -342,7 +342,7 @@ prop_chairman = H.propertyOnce . H.workspace "chairman" $ \tempAbsPath -> do
       ]
 
   -- Generated node operator keys (cold, hot) and operational certs
-  forM_ allNodes $ \node -> H.noteEachM_ . H.listDirectory $ tempAbsPath </> node </> "byron"
+  forM_ allNodes $ \node -> H.noteShowEachM_ . H.listDirectory $ tempAbsPath </> node </> "byron"
 
   -- Make some payment and stake addresses
   -- user1..n:       will own all the funds in the system, we'll set this up from
@@ -411,7 +411,7 @@ prop_chairman = H.propertyOnce . H.workspace "chairman" $ \tempAbsPath -> do
 
   -- Generated payment address keys, stake address keys,
   -- stake address regitration certs, and stake address delegatation certs
-  H.noteEachM_ . H.listDirectory $ tempAbsPath </> "addresses"
+  H.noteShowEachM_ . H.listDirectory $ tempAbsPath </> "addresses"
 
   -- Next is to make the stake pool registration cert
   forM_ poolNodes $ \node -> do
