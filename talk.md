@@ -32,11 +32,12 @@ $ cabal test cardano-node-chairman --test-show-details=direct
 * Missing annotation on exception
   * Caused by un-intercepted exceptions
   * Laziness causing un-intercepted exceptions
-* Laziness triggering
+* Island annotations
 * Workspaces
 * Effectful assertions
 * Deadline assertions
 * Annotate on cleanup (not yet available; https://github.com/hedgehogqa/haskell-hedgehog/issues/399)
+* Aborted STM experiment: https://github.com/input-output-hk/cardano-node/pull/1665
 * Resource cleanup (see Integration/propertyOnce)
 * Annotations in all the functions
 * Launching executables with the right binary
@@ -44,4 +45,10 @@ $ cabal test cardano-node-chairman --test-show-details=direct
   * cabal exec (not good, dirty output, triggers configure)
   * plan.json
   * environment variable
-
+* Fun hurdles:
+  * Starting process in the temporary directory
+  * Allocating random ports
+  * Unix domain socket, named pipes and naming restrictions
+  * Saving stdout/stderr output
+  * Rewrite configuration files
+  * Piping configuration around
