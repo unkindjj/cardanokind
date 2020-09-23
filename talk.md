@@ -3,6 +3,7 @@
 
 Chairman tests:
 
+```
   [ chairman ] <-> [ socket 1 ]    [ socket 2 ]    [ socket 3 ]
         |               ^               ^               ^
         |               |               |               |
@@ -12,11 +13,14 @@ Chairman tests:
         |               |               |               |
         v               v               v               v
   [ stdout c ]     [ stdout 1 ]    [ stdout 1 ]    [ stdout 1 ]
+```
 
 # Running
 
+```
 $ cabal build cardano-node cardano-cli cardano-node-chairman
 $ cabal test cardano-node-chairman --test-show-details=direct
+```
 
 # Design considerations
 
