@@ -20,46 +20,26 @@ import           Data.Text (pack)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
+import           Cardano.Api.Shelley hiding (TxId, ValidationErr)
 
 import           Cardano.Tracing.OrphanInstances.Common
 import           Cardano.Tracing.OrphanInstances.Network ()
-import           Cardano.Tracing.Render (renderChainHash, renderChunkNo,
-                     renderHeaderHash, renderHeaderHashForVerbosity,
-                     renderPoint, renderPointAsPhrase, renderPointForVerbosity,
-                     renderRealPointAsPhrase, renderTipForVerbosity,
-                     renderTipBlockNo, renderTipHash, renderWithOrigin)
+import           Cardano.Tracing.Render (renderChainHash, renderChunkNo, renderHeaderHash,
+                     renderHeaderHashForVerbosity, renderPoint, renderPointAsPhrase,
+                     renderPointForVerbosity, renderRealPointAsPhrase, renderTipBlockNo,
+                     renderTipForVerbosity, renderTipHash, renderWithOrigin)
 
-import           Ouroboros.Consensus.Block (BlockProtocol, CannotForge, ConvertRawHash (..),
-                     ForgeStateUpdateError, Header, RealPoint, getHeader, headerPoint,
-                     realPointHash, realPointSlot)
-import           Ouroboros.Consensus.HeaderValidation
-import           Ouroboros.Consensus.Ledger.Abstract
 import           Ouroboros.Consensus.Ledger.Extended
-import           Ouroboros.Consensus.Ledger.Inspect (InspectLedger, LedgerEvent (..), LedgerUpdate,
-                     LedgerWarning)
 import           Ouroboros.Consensus.Ledger.SupportsMempool (ApplyTxErr, GenTx, GenTxId, HasTxId,
                      TxId, txId)
-import           Ouroboros.Consensus.Ledger.SupportsProtocol (LedgerSupportsProtocol)
-import           Ouroboros.Consensus.Mempool.API (MempoolSize (..), TraceEventMempool (..))
 import           Ouroboros.Consensus.MiniProtocol.BlockFetch.Server (TraceBlockFetchServerEvent)
 import           Ouroboros.Consensus.MiniProtocol.ChainSync.Client (TraceChainSyncClientEvent (..))
 import           Ouroboros.Consensus.MiniProtocol.ChainSync.Server (TraceChainSyncServerEvent (..))
 import           Ouroboros.Consensus.MiniProtocol.LocalTxSubmission.Server
                      (TraceLocalTxSubmissionServerEvent (..))
-import           Ouroboros.Consensus.Node.Run (RunNode (..))
-import           Ouroboros.Consensus.Node.Tracers (TraceForgeEvent (..))
 import           Ouroboros.Consensus.Protocol.Abstract
-import qualified Ouroboros.Consensus.Protocol.BFT as BFT
 import qualified Ouroboros.Consensus.Protocol.PBFT as PBFT
 import qualified Ouroboros.Consensus.Storage.VolatileDB.Impl as VolDb
-
-import           Ouroboros.Consensus.Util.Condense
-import           Ouroboros.Consensus.Util.Orphans ()
-
-import qualified Ouroboros.Network.AnchoredFragment as AF
-import           Ouroboros.Network.Block (BlockNo (..), ChainUpdate (..), SlotNo (..), StandardHash,
-                     blockHash, pointSlot)
-import           Ouroboros.Network.Point (withOrigin)
 
 import qualified Ouroboros.Consensus.Storage.ChainDB as ChainDB
 -- TODO: 'TraceCacheEvent' should be exported by the 'Impl' module
@@ -364,25 +344,25 @@ instance ( ConvertRawHash blk
         ChainDB.TrySwitchToAFork pt _ -> \_o ->
           "Block fits onto some fork: " <> renderRealPointAsPhrase pt
         ChainDB.AddedToCurrentChain es _ _ c -> \_o ->
-          "Chain extended, new tip: " <> renderPointAsPhrase (AF.headPoint c) <>
+          "Chain extended, new tip: " <> renderPointAsPhrase (headPoint c) <>
           Text.concat [ "\nEvent: " <> showT e | e <- es ]
         ChainDB.SwitchedToAFork es _ _ c -> \_o ->
-          "Switched to a fork, new tip: " <> renderPointAsPhrase (AF.headPoint c) <>
+          "Switched to a fork, new tip: " <> renderPointAsPhrase (headPoint c) <>
           Text.concat [ "\nEvent: " <> showT e | e <- es ]
         ChainDB.AddBlockValidation ev' -> case ev' of
           ChainDB.InvalidBlock err pt -> \_o ->
             "Invalid block " <> renderRealPointAsPhrase pt <> ": " <> showT err
           ChainDB.InvalidCandidate c -> \_o ->
-            "Invalid candidate " <> renderPointAsPhrase (AF.headPoint c)
+            "Invalid candidate " <> renderPointAsPhrase (headPoint c)
           ChainDB.ValidCandidate c -> \_o ->
-            "Valid candidate " <> renderPointAsPhrase (AF.headPoint c)
+            "Valid candidate " <> renderPointAsPhrase (headPoint c)
           ChainDB.CandidateContainsFutureBlocks c hdrs -> \_o ->
             "Candidate contains blocks from near future:  " <>
-            renderPointAsPhrase (AF.headPoint c) <> ", slots " <>
+            renderPointAsPhrase (headPoint c) <> ", slots " <>
             Text.intercalate ", " (map (renderPoint . headerPoint) hdrs)
           ChainDB.CandidateContainsFutureBlocksExceedingClockSkew c hdrs -> \_o ->
             "Candidate contains blocks from future exceeding clock skew limit: " <>
-            renderPointAsPhrase (AF.headPoint c) <> ", slots " <>
+            renderPointAsPhrase (headPoint c) <> ", slots " <>
             Text.intercalate ", " (map (renderPoint . headerPoint) hdrs)
         ChainDB.AddedBlockToVolatileDB pt _ _ -> \_o ->
           "Chain added block " <> renderRealPointAsPhrase pt
@@ -450,8 +430,8 @@ instance ( ConvertRawHash blk
 --
 -- NOTE: this list is sorted by the unqualified name of the outermost type.
 
-instance ToObject BFT.BftValidationErr where
-  toObject _verb (BFT.BftInvalidSignature err) =
+instance ToObject BftValidationErr where
+  toObject _verb (BftInvalidSignature err) =
     mkObject
       [ "kind" .= String "BftInvalidSignature"
       , "error" .= String (pack err)
@@ -625,7 +605,7 @@ instance ( ConvertRawHash blk
     ChainDB.AddedToCurrentChain events _ base extended ->
       mkObject $
                [ "kind" .= String "TraceAddBlockEvent.AddedToCurrentChain"
-               , "newtip" .= renderPointForVerbosity verb (AF.headPoint extended)
+               , "newtip" .= renderPointForVerbosity verb (headPoint extended)
                ]
             ++ [ "headers" .= toJSON (toObject verb `map` addedHdrsNewChain base extended)
                | verb == MaximalVerbosity ]
@@ -634,7 +614,7 @@ instance ( ConvertRawHash blk
     ChainDB.SwitchedToAFork events _ old new ->
       mkObject $
                [ "kind" .= String "TraceAddBlockEvent.SwitchedToAFork"
-               , "newtip" .= renderPointForVerbosity verb (AF.headPoint new)
+               , "newtip" .= renderPointForVerbosity verb (headPoint new)
                ]
             ++ [ "headers" .= toJSON (toObject verb `map` addedHdrsNewChain old new)
                | verb == MaximalVerbosity ]
@@ -647,17 +627,17 @@ instance ( ConvertRawHash blk
                  , "error" .= show err ]
       ChainDB.InvalidCandidate c ->
         mkObject [ "kind" .= String "TraceAddBlockEvent.AddBlockValidation.InvalidCandidate"
-                 , "block" .= renderPointForVerbosity verb (AF.headPoint c) ]
+                 , "block" .= renderPointForVerbosity verb (headPoint c) ]
       ChainDB.ValidCandidate c ->
         mkObject [ "kind" .= String "TraceAddBlockEvent.AddBlockValidation.ValidCandidate"
-                 , "block" .= renderPointForVerbosity verb (AF.headPoint c) ]
+                 , "block" .= renderPointForVerbosity verb (headPoint c) ]
       ChainDB.CandidateContainsFutureBlocks c hdrs ->
         mkObject [ "kind" .= String "TraceAddBlockEvent.AddBlockValidation.CandidateContainsFutureBlocks"
-                 , "block"   .= renderPointForVerbosity verb (AF.headPoint c)
+                 , "block"   .= renderPointForVerbosity verb (headPoint c)
                  , "headers" .= map (renderPointForVerbosity verb . headerPoint) hdrs ]
       ChainDB.CandidateContainsFutureBlocksExceedingClockSkew c hdrs ->
         mkObject [ "kind" .= String "TraceAddBlockEvent.AddBlockValidation.CandidateContainsFutureBlocksExceedingClockSkew"
-                 , "block"   .= renderPointForVerbosity verb (AF.headPoint c)
+                 , "block"   .= renderPointForVerbosity verb (headPoint c)
                  , "headers" .= map (renderPointForVerbosity verb . headerPoint) hdrs ]
     ChainDB.AddedBlockToVolatileDB pt (BlockNo bn) _ ->
       mkObject [ "kind" .= String "TraceAddBlockEvent.AddedBlockToVolatileDB"
@@ -668,13 +648,13 @@ instance ( ConvertRawHash blk
                , "block" .= toObject verb pt ]
    where
      addedHdrsNewChain
-       :: AF.AnchoredFragment (Header blk)
-       -> AF.AnchoredFragment (Header blk)
+       :: AnchoredFragment (Header blk)
+       -> AnchoredFragment (Header blk)
        -> [Header blk]
      addedHdrsNewChain fro to_ =
-       case AF.intersect fro to_ of
-         Just (_, _, _, s2 :: AF.AnchoredFragment (Header blk)) ->
-           AF.toOldestFirst s2
+       case intersect fro to_ of
+         Just (_, _, _, s2 :: AnchoredFragment (Header blk)) ->
+           toOldestFirst s2
          Nothing -> [] -- No sense to do validation here.
   toObject MinimalVerbosity (ChainDB.TraceLedgerReplayEvent _ev) = emptyObject -- no output
   toObject verb (ChainDB.TraceLedgerReplayEvent ev) = case ev of

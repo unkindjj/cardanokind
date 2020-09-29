@@ -38,8 +38,6 @@ import qualified Network.Socket as Socket (SockAddr)
 import           Control.Tracer
 import           Control.Tracer.Transformers
 
-import           Cardano.Slotting.Slot (EpochNo (..))
-
 import           Cardano.BM.Data.Aggregated (Measurable (..))
 import           Cardano.BM.Data.LogItem (LOContent (..), LoggerName,
                      PrivacyAnnotation (Confidential), mkLOMeta)
@@ -49,32 +47,16 @@ import           Cardano.BM.Internal.ElidingTracer
 import           Cardano.BM.Trace (appendName, traceNamedObject)
 import           Cardano.BM.Tracing
 
-import           Ouroboros.Consensus.Block (BlockProtocol, CannotForge, ConvertRawHash,
-                     ForgeStateInfo, ForgeStateUpdateError, Header, realPointSlot)
-import           Ouroboros.Consensus.BlockchainTime (SystemStart (..),
-                     TraceBlockchainTimeEvent (..))
-import           Ouroboros.Consensus.HeaderValidation (OtherHeaderEnvelopeError)
-import           Ouroboros.Consensus.Ledger.Abstract (LedgerErr, LedgerState)
-import           Ouroboros.Consensus.Ledger.Extended (ledgerState)
-import           Ouroboros.Consensus.Ledger.Inspect (InspectLedger, LedgerEvent)
-import           Ouroboros.Consensus.Ledger.SupportsMempool (ApplyTxErr, GenTx, GenTxId, HasTxs)
-import           Ouroboros.Consensus.Ledger.SupportsProtocol (LedgerSupportsProtocol)
-import           Ouroboros.Consensus.Mempool.API (MempoolSize (..), TraceEventMempool (..))
+--import           Cardano.Api.Shelley hiding (LedgerState, Tracers, ValidationErr, nullTracers)
+import           Cardano.Api.Shelley hiding (Tracers, ValidationErr, nullTracers)
+import qualified Cardano.Api.Shelley as Shelley
+import           Ouroboros.Consensus.Ledger.Abstract (LedgerErr)
 import qualified Ouroboros.Consensus.Network.NodeToClient as NodeToClient
-import qualified Ouroboros.Consensus.Network.NodeToNode as NodeToNode
-import qualified Ouroboros.Consensus.Node.Run as Consensus (RunNode)
 import qualified Ouroboros.Consensus.Node.Tracers as Consensus
 import           Ouroboros.Consensus.Protocol.Abstract (ValidationErr)
 
-import qualified Ouroboros.Network.AnchoredFragment as AF
-import           Ouroboros.Network.Block (BlockNo (..), HasHeader (..), Point, StandardHash,
-                     blockNo, pointSlot, unBlockNo, unSlotNo)
-import           Ouroboros.Network.BlockFetch.ClientState (TraceLabelPeer (..))
-import           Ouroboros.Network.BlockFetch.Decision (FetchDecision, FetchDecline (..))
 import qualified Ouroboros.Network.NodeToClient as NtC
 import qualified Ouroboros.Network.NodeToNode as NtN
-import           Ouroboros.Network.Point (fromWithOrigin, withOrigin)
-import           Ouroboros.Network.Subscription
 
 import qualified Ouroboros.Consensus.Storage.ChainDB as ChainDB
 import qualified Ouroboros.Consensus.Storage.LedgerDB.OnDisk as LedgerDB
@@ -101,7 +83,7 @@ data Tracers peer localPeer blk = Tracers
     -- | Consensus-specific tracers.
   , consensusTracers :: Consensus.Tracers IO peer localPeer blk
     -- | Tracers for the node-to-node protocols.
-  , nodeToNodeTracers :: NodeToNode.Tracers IO peer blk DeserialiseFailure
+  , nodeToNodeTracers :: Shelley.Tracers IO peer blk DeserialiseFailure
     --, serialisedBlockTracer :: NodeToNode.SerialisedTracer IO peer blk (SerialisedBlockTrace)
     -- | Tracers for the node-to-client protocols
   , nodeToClientTracers :: NodeToClient.Tracers IO localPeer blk DeserialiseFailure
@@ -142,7 +124,7 @@ nullTracers = Tracers
   { chainDBTracer = nullTracer
   , consensusTracers = Consensus.nullTracers
   , nodeToClientTracers = NodeToClient.nullTracers
-  , nodeToNodeTracers = NodeToNode.nullTracers
+  , nodeToNodeTracers = Shelley.nullTracers
   , ipSubscriptionTracer = nullTracer
   , dnsSubscriptionTracer = nullTracer
   , dnsResolverTracer = nullTracer
@@ -267,7 +249,7 @@ initialBlockchainCounters = BlockchainCounters 0 0 0 0 0
 --
 mkTracers
   :: forall peer localPeer blk.
-     ( Consensus.RunNode blk
+     ( RunNode blk
      , HasKESMetricsData blk
      , TraceConstraints blk
      , Show peer, Eq peer
@@ -326,12 +308,12 @@ mkTracers TracingOff _ _ =
       , NodeToClient.tTxSubmissionTracer = nullTracer
       , NodeToClient.tStateQueryTracer = nullTracer
       }
-    , nodeToNodeTracers = NodeToNode.Tracers
-      { NodeToNode.tChainSyncTracer = nullTracer
-      , NodeToNode.tChainSyncSerialisedTracer = nullTracer
-      , NodeToNode.tBlockFetchTracer = nullTracer
-      , NodeToNode.tBlockFetchSerialisedTracer = nullTracer
-      , NodeToNode.tTxSubmissionTracer = nullTracer
+    , nodeToNodeTracers = Shelley.Tracers
+      { tChainSyncTracer = nullTracer
+      , tChainSyncSerialisedTracer = nullTracer
+      , tBlockFetchTracer = nullTracer
+      , tBlockFetchSerialisedTracer = nullTracer
+      , tTxSubmissionTracer = nullTracer
       }
     , ipSubscriptionTracer = nullTracer
     , dnsSubscriptionTracer= nullTracer
@@ -425,7 +407,7 @@ mkConsensusTracers
      , ToObject (OtherHeaderEnvelopeError blk)
      , ToObject (ValidationErr (BlockProtocol blk))
      , ToObject (ForgeStateUpdateError blk)
-     , Consensus.RunNode blk
+     , RunNode blk
      , HasKESMetricsData blk
      )
   => TraceSelection
@@ -486,7 +468,7 @@ mkConsensusTracers trSel verb tr nodeKern bcCounters = do
 
 teeForge ::
   forall blk
-  . ( Consensus.RunNode blk
+  . ( RunNode blk
      , LedgerQueries blk
      , ToObject (CannotForge blk)
      , ToObject (LedgerErr (LedgerState blk))
@@ -578,7 +560,7 @@ teeForge' tr =
           LogValue "adoptedSlotLast" $ PureI $ fromIntegral $ unSlotNo slot
 
 forgeTracer
-  :: ( Consensus.RunNode blk
+  :: ( RunNode blk
      , LedgerQueries blk
      , ToObject (CannotForge blk)
      , ToObject (LedgerErr (LedgerState blk))
@@ -818,7 +800,7 @@ nodeToClientTracers' trSel verb tr =
 --------------------------------------------------------------------------------
 
 nodeToNodeTracers'
-  :: ( Consensus.RunNode blk
+  :: ( RunNode blk
      , ConvertTxId blk
      , HasTxs blk
      , Show peer
@@ -826,14 +808,14 @@ nodeToNodeTracers'
   => TraceSelection
   -> TracingVerbosity
   -> Trace IO Text
-  -> NodeToNode.Tracers' peer blk DeserialiseFailure (Tracer IO)
+  -> Tracers' peer blk DeserialiseFailure (Tracer IO)
 nodeToNodeTracers' trSel verb tr =
-  NodeToNode.Tracers
-  { NodeToNode.tChainSyncTracer = tracerOnOff (traceChainSyncProtocol trSel) verb "ChainSyncProtocol" tr
-  , NodeToNode.tChainSyncSerialisedTracer = showOnOff (traceChainSyncProtocol trSel) "ChainSyncProtocolSerialised" tr
-  , NodeToNode.tBlockFetchTracer = tracerOnOff (traceBlockFetchProtocol trSel) verb "BlockFetchProtocol" tr
-  , NodeToNode.tBlockFetchSerialisedTracer = showOnOff (traceBlockFetchProtocolSerialised trSel) "BlockFetchProtocolSerialised" tr
-  , NodeToNode.tTxSubmissionTracer = tracerOnOff (traceTxSubmissionProtocol trSel) verb "TxSubmissionProtocol" tr
+  Shelley.Tracers
+  { tChainSyncTracer = tracerOnOff (traceChainSyncProtocol trSel) verb "ChainSyncProtocol" tr
+  , tChainSyncSerialisedTracer = showOnOff (traceChainSyncProtocol trSel) "ChainSyncProtocolSerialised" tr
+  , tBlockFetchTracer = tracerOnOff (traceBlockFetchProtocol trSel) verb "BlockFetchProtocol" tr
+  , tBlockFetchSerialisedTracer = showOnOff (traceBlockFetchProtocolSerialised trSel) "BlockFetchProtocolSerialised" tr
+  , tTxSubmissionTracer = tracerOnOff (traceTxSubmissionProtocol trSel) verb "TxSubmissionProtocol" tr
   }
 
 teeTraceBlockFetchDecision
@@ -890,7 +872,7 @@ data ChainInformation = ChainInformation
 chainInformation
   :: forall blk. HasHeader (Header blk)
   => ChainDB.NewTipInfo blk
-  -> AF.AnchoredFragment (Header blk)
+  -> AnchoredFragment (Header blk)
   -> ChainInformation
 chainInformation newTipInfo frag = ChainInformation
     { slots       = slotN
@@ -904,15 +886,15 @@ chainInformation newTipInfo frag = ChainInformation
     calcDensity bl sl
       | sl > 0 = toRational bl / toRational sl
       | otherwise = 0
-    slotN  = unSlotNo $ fromWithOrigin 0 (AF.headSlot frag)
+    slotN  = unSlotNo $ fromWithOrigin 0 (headSlot frag)
     -- Slot of the tip - slot @k@ blocks back. Use 0 as the slot for genesis
     -- includes EBBs
     slotD   = slotN
-            - unSlotNo (fromWithOrigin 0 (AF.lastSlot frag))
+            - unSlotNo (fromWithOrigin 0 (lastSlot frag))
     -- Block numbers start at 1. We ignore the genesis EBB, which has block number 0.
     blockD = blockN - firstBlock
-    blockN = unBlockNo $ fromWithOrigin (BlockNo 1) (AF.headBlockNo frag)
-    firstBlock = case unBlockNo . blockNo <$> AF.last frag of
+    blockN = unBlockNo $ fromWithOrigin (BlockNo 1) (headBlockNo frag)
+    firstBlock = case unBlockNo . blockNo <$> last frag of
       -- Empty fragment, no blocks. We have that @blocks = 1 - 1 = 0@
       Left _  -> 1
       -- The oldest block is the genesis EBB with block number 0,

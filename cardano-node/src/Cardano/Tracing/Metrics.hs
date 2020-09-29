@@ -19,18 +19,9 @@ module Cardano.Tracing.Metrics
 import           Cardano.Prelude hiding ((:.:), All)
 
 import           Cardano.Api.Byron
+import           Cardano.Api.Shelley
 import           Cardano.Crypto.KES.Class (Period)
 import           Data.SOP.Strict ((:.:) (..), All, K (..), hcmap, hcollapse)
-import           Ouroboros.Consensus.Block (ForgeStateInfo)
-import           Ouroboros.Consensus.HardFork.Combinator
-import           Ouroboros.Consensus.HardFork.Combinator.AcrossEras (PerEraForgeStateInfo (..))
-import           Ouroboros.Consensus.Shelley.Ledger.Block (ShelleyBlock)
-import           Ouroboros.Consensus.Shelley.Node ()
-import qualified Ouroboros.Consensus.Shelley.Protocol.HotKey as HotKey
-import           Ouroboros.Consensus.TypeFamilyWrappers (WrapForgeStateInfo (..))
-import qualified Ouroboros.Consensus.Util.OptNP as OptNP
-import           Shelley.Spec.Ledger.OCert (KESPeriod (..))
-
 
 -- | KES-related data to be traced as metrics.
 data KESMetricsData
@@ -64,7 +55,7 @@ instance HasKESMetricsData (ShelleyBlock c) where
   getKESMetricsData _ forgeStateInfo =
       TPraosKESMetricsData currKesPeriod maxKesEvos oCertStartKesPeriod
     where
-      HotKey.KESInfo
+      KESInfo
         { kesStartPeriod = KESPeriod startKesPeriod
         , kesEvolution = currKesPeriod
         , kesEndPeriod = KESPeriod endKesPeriod
@@ -82,7 +73,7 @@ instance All HasKESMetricsData xs => HasKESMetricsData (HardForkBlock xs) where
         combineKESMetrics
       . hcollapse
       . hcmap (Proxy @ HasKESMetricsData) getOne
-      . OptNP.toNP
+      . toNP
       . getPerEraForgeStateInfo
       $ forgeStateInfo
     where

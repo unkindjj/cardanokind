@@ -274,6 +274,7 @@ test-suite cardano-node-test
                       , aeson
                       , async
                       , bytestring
+                      , cardano-api
                       , cardano-config
                       , cardano-crypto-class
                       , cardano-crypto-test

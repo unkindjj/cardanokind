@@ -28,6 +28,7 @@ import qualified Cardano.Crypto.Hash.Class as Crypto
 
 import           Cardano.API hiding (Hash, TxId, TxIn, TxOut)
 import           Cardano.Api.Shelley hiding (Hash, TxId, TxIn, TxOut)
+import qualified Shelley.Spec.Ledger.LedgerState as Ledger
 
 import           Shelley.Spec.Ledger.TxBody (TxId (TxId), TxIn (TxIn), TxOut (TxOut))
 -- Shelley.Spec.Ledger.TxBody conflicts with typed api
@@ -65,11 +66,11 @@ instance ToJSON (OneEraHash xs) where
 
 instance ToJSON (HeaderHash blk) => ToJSON (Tip blk) where
   toJSON TipGenesis = object [ "genesis" .= True ]
-  toJSON (Tip slotNo headerHash blockNo) =
+  toJSON (Tip slotNo headerHash blockNo') =
     object
       [ "slotNo"     .= slotNo
       , "headerHash" .= headerHash
-      , "blockNo"    .= blockNo
+      , "blockNo"    .= blockNo'
       ]
 
 -- This instance is temporarily duplicated in cardano-config
@@ -106,7 +107,7 @@ deriving instance ToJSON (InstantaneousRewards StandardShelley)
 deriving instance ToJSON (SnapShot StandardShelley)
 deriving instance ToJSON (SnapShots StandardShelley)
 deriving instance ToJSON (NonMyopic StandardShelley)
-deriving instance ToJSON (LedgerState StandardShelley)
+deriving instance ToJSON (Ledger.LedgerState StandardShelley)
 deriving instance ToJSON (EpochState StandardShelley)
 deriving instance ToJSON (PParams' StrictMaybe StandardShelley)
 deriving instance ToJSON (PState StandardShelley)

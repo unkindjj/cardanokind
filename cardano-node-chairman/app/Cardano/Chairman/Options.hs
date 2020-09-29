@@ -9,7 +9,7 @@ module Cardano.Chairman.Options
   , opts
   ) where
 
-import           Cardano.Api.Byron
+import           Cardano.Api.Byron hiding (Protocol)
 import           Cardano.Api.Shelley hiding (Protocol (..))
 import           Cardano.Chain.Slotting (EpochSlots (..))
 import           Cardano.Node.Protocol.Types (Protocol (..))
@@ -18,9 +18,6 @@ import           Cardano.Prelude hiding (option)
 import           Control.Applicative (some)
 import           Control.Monad.Class.MonadTime (DiffTime)
 import           Options.Applicative
-import           Ouroboros.Consensus.BlockchainTime (SlotLength, slotLengthFromSec)
-import           Ouroboros.Consensus.Cardano (SecurityParam (..))
-import           Ouroboros.Network.Block (BlockNo)
 
 import qualified Options.Applicative as Opt
 

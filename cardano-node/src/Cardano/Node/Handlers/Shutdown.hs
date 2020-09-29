@@ -31,10 +31,11 @@ import           System.Posix.Types (Fd (Fd))
 import qualified System.Process as IO (createPipeFd)
 
 import           Cardano.Api.Shelley hiding (getTipPoint)
+import           Ouroboros.Consensus.Storage.ChainDB (getTipPoint)
+
 import           Cardano.BM.Data.Tracer (TracingVerbosity (..), severityNotice, trTransformer)
 import           Cardano.BM.Trace
 import           Control.Tracer
-import           Ouroboros.Consensus.Storage.ChainDB (getTipPoint)
 
 import           Cardano.Node.Configuration.POM (NodeConfiguration (..))
 

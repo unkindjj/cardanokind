@@ -29,16 +29,14 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
+import           Cardano.Api.Shelley hiding (TxId)
+
 import           Cardano.BM.Tracing (TracingVerbosity (..))
-import           Cardano.Slotting.Slot (EpochNo (..), SlotNo (..), WithOrigin (..))
 import           Cardano.Tracing.ConvertTxId (ConvertTxId (..))
-import           Ouroboros.Consensus.Block (BlockNo (..), ConvertRawHash (..), RealPoint (..))
-import           Ouroboros.Consensus.Block.Abstract (Point (..))
 import           Ouroboros.Consensus.Ledger.SupportsMempool (GenTx, TxId)
-import           Ouroboros.Consensus.Storage.ImmutableDB.Chunks.Internal (ChunkNo (..))
-import           Ouroboros.Consensus.Storage.ImmutableDB.Impl.Types (BlockOrEBB (..))
 import qualified Ouroboros.Consensus.Storage.ImmutableDB.API as ImmDB
-import           Ouroboros.Network.Block (ChainHash (..), HeaderHash, StandardHash, Tip, getTipPoint)
+import           Ouroboros.Network.Block (ChainHash (..), HeaderHash, StandardHash, Tip,
+                     getTipPoint)
 
 renderBlockOrEBB :: BlockOrEBB -> Text
 renderBlockOrEBB (Block slotNo) = "Block at " <> renderSlotNo slotNo

@@ -34,7 +34,7 @@ import           Cardano.CLI.Shelley.Key (SigningKeyDecodeError (..), readSignin
 import           Cardano.CLI.Shelley.Parsers
 import           Cardano.CLI.Types
 
-import           Cardano.Api.Byron
+import           Cardano.Api.Byron hiding (Protocol)
 import           Cardano.Api.Shelley
 import qualified Cardano.Api.Shelley as Api
 

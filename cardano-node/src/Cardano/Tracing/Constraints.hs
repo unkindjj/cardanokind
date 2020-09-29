@@ -11,15 +11,9 @@ import           Cardano.BM.Tracing (ToObject)
 import           Cardano.Tracing.ConvertTxId (ConvertTxId)
 import           Cardano.Tracing.Queries (LedgerQueries)
 
-import           Ouroboros.Consensus.Block (BlockProtocol, CannotForge,
-                     ForgeStateUpdateError, Header)
-import           Ouroboros.Consensus.HeaderValidation (OtherHeaderEnvelopeError)
-import           Ouroboros.Consensus.Ledger.Abstract (LedgerError)
-import           Ouroboros.Consensus.Ledger.Inspect (LedgerEvent)
-import           Ouroboros.Consensus.Ledger.SupportsMempool (ApplyTxErr,  HasTxId,
-                     HasTxs (..))
+import           Cardano.Api.Shelley hiding (TxId, ValidationErr)
 import           Ouroboros.Consensus.Protocol.Abstract (ValidationErr)
-import           Ouroboros.Consensus.Shelley.Ledger.Mempool (GenTx, TxId)
+import           Ouroboros.Consensus.Shelley.Ledger.Mempool (TxId)
 
 
 -- | Tracing-related constraints for monitoring purposes.

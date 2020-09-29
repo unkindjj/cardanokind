@@ -30,57 +30,17 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
 
-import           Cardano.Slotting.Block (BlockNo (..))
 import           Cardano.Tracing.OrphanInstances.Common
 import           Cardano.Tracing.OrphanInstances.Consensus ()
 
 import           Cardano.Crypto.Hash.Class (Hash)
-import           Cardano.Crypto.Hash.Class as Crypto
+import qualified Cardano.Crypto.Hash.Class as Crypto
 
-import           Ouroboros.Consensus.Block (Header)
-import           Ouroboros.Consensus.Ledger.SupportsMempool (GenTx, txId)
+import           Cardano.Api.Shelley hiding (Hash, TxId, TxIn, TxOut)
+
 import qualified Ouroboros.Consensus.Ledger.SupportsMempool as SupportsMempool
-import           Ouroboros.Consensus.Util.Condense (condense)
-import           Ouroboros.Network.Block (SlotNo (..), blockHash, blockNo, blockSlot)
-import           Ouroboros.Network.Point (WithOrigin, withOriginToMaybe)
 
-import           Ouroboros.Consensus.Shelley.Ledger hiding (TxId)
-import           Ouroboros.Consensus.Shelley.Protocol (TPraosCannotForge (..))
-import qualified Ouroboros.Consensus.Shelley.Protocol.HotKey as HotKey
-
--- TODO: this should be exposed via Cardano.Api
-import           Shelley.Spec.Ledger.API
-import           Shelley.Spec.Ledger.BlockChain (LastAppliedBlock (..))
-import           Shelley.Spec.Ledger.Keys (KeyHash (..))
-import           Shelley.Spec.Ledger.LedgerState (WitHashes (..))
-import           Shelley.Spec.Ledger.OCert
-
-import           Shelley.Spec.Ledger.MetaData (MetaDataHash (..))
-import           Shelley.Spec.Ledger.STS.Bbody
-import           Shelley.Spec.Ledger.STS.Chain
-import           Shelley.Spec.Ledger.STS.Deleg
-import           Shelley.Spec.Ledger.STS.Delegs
-import           Shelley.Spec.Ledger.STS.Delpl
-import           Shelley.Spec.Ledger.STS.Epoch
-import           Shelley.Spec.Ledger.STS.Ledger
-import           Shelley.Spec.Ledger.STS.Ledgers
-import           Shelley.Spec.Ledger.STS.Mir
-import           Shelley.Spec.Ledger.STS.NewEpoch
-import           Shelley.Spec.Ledger.STS.Newpp
-import           Shelley.Spec.Ledger.STS.Ocert
-import           Shelley.Spec.Ledger.STS.Overlay
-import           Shelley.Spec.Ledger.STS.Pool
-import           Shelley.Spec.Ledger.STS.PoolReap
-import           Shelley.Spec.Ledger.STS.Ppup
-import           Shelley.Spec.Ledger.STS.Prtcl
-import           Shelley.Spec.Ledger.STS.Rupd
-import           Shelley.Spec.Ledger.STS.Snap
-import           Shelley.Spec.Ledger.STS.Tick
-import           Shelley.Spec.Ledger.STS.Tickn
-import           Shelley.Spec.Ledger.STS.Updn
-import           Shelley.Spec.Ledger.STS.Utxo
-import           Shelley.Spec.Ledger.STS.Utxow
-import           Shelley.Spec.Ledger.TxBody (MIRPot (..), TxId (..), TxIn (..), TxOut (..))
+import           Shelley.Spec.Ledger.TxBody (TxId (..), TxIn (..), TxOut (..))
 
 {- HLINT ignore "Use :" -}
 
@@ -126,8 +86,8 @@ instance ToObject (TPraosCannotForge era) where
 
 deriving newtype instance ToJSON KESPeriod
 
-instance ToObject HotKey.KESInfo where
-  toObject _verb HotKey.KESInfo { kesStartPeriod, kesEndPeriod, kesEvolution } =
+instance ToObject KESInfo where
+  toObject _verb KESInfo { kesStartPeriod, kesEndPeriod, kesEvolution } =
     mkObject
       [ "kind" .= String "KESInfo"
       , "startPeriod" .= kesStartPeriod
@@ -135,14 +95,14 @@ instance ToObject HotKey.KESInfo where
       , "evolution" .= kesEvolution
       ]
 
-instance ToObject HotKey.KESEvolutionError where
-  toObject verb (HotKey.KESCouldNotEvolve kesInfo targetPeriod) =
+instance ToObject KESEvolutionError where
+  toObject verb (KESCouldNotEvolve kesInfo targetPeriod) =
     mkObject
       [ "kind" .= String "KESCouldNotEvolve"
       , "kesInfo" .= toObject verb kesInfo
       , "targetPeriod" .= targetPeriod
       ]
-  toObject verb (HotKey.KESKeyAlreadyPoisoned kesInfo targetPeriod) =
+  toObject verb (KESKeyAlreadyPoisoned kesInfo targetPeriod) =
     mkObject
       [ "kind" .= String "KESKeyAlreadyPoisoned"
       , "kesInfo" .= toObject verb kesInfo
@@ -194,9 +154,9 @@ instance Era era => ToObject (ChainPredicateFailure era) where
   toObject verb (PrtclSeqFailure f) = toObject verb f
 
 instance Era era => ToObject (PrtlSeqFailure era) where
-  toObject _verb (WrongSlotIntervalPrtclSeq (SlotNo lastSlot) (SlotNo currSlot)) =
+  toObject _verb (WrongSlotIntervalPrtclSeq (SlotNo lastSlot') (SlotNo currSlot)) =
     mkObject [ "kind" .= String "WrongSlotInterval"
-             , "lastSlot" .= lastSlot
+             , "lastSlot" .= lastSlot'
              , "currentSlot" .= currSlot
              ]
   toObject _verb (WrongBlockNoPrtclSeq lab currentBlockNo) =
@@ -607,9 +567,6 @@ instance ToObject (UpdnPredicateFailure era) where
 --------------------------------------------------------------------------------
 -- Helper functions
 --------------------------------------------------------------------------------
-
-textShow :: Show a => a -> Text
-textShow = Text.pack . show
 
 showLastAppBlockNo :: WithOrigin (LastAppliedBlock crypto) -> Text
 showLastAppBlockNo wOblk =  case withOriginToMaybe wOblk of

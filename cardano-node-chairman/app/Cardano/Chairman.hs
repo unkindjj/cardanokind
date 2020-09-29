@@ -14,7 +14,8 @@ module Cardano.Chairman (chairmanTest) where
 import           Cardano.Prelude hiding (ByteString, STM, atomically, catch, option, show)
 
 import           Cardano.API
-import           Cardano.Api.Shelley
+import           Cardano.Api.Shelley hiding (addBlock, rollback)
+import qualified Cardano.Api.Shelley as Shelley
 
 import           Cardano.Node.Types (SocketPath (..))
 import           Control.Concurrent.Async (forConcurrently_)
@@ -31,22 +32,10 @@ import           Data.Coerce (coerce)
 import           Data.Map.Strict (Map)
 import           Data.Proxy (Proxy (..))
 import           Data.Void (Void)
-import           Network.Mux (MuxError, MuxMode (..))
-import           Ouroboros.Consensus.Block (BlockProtocol, CodecConfig, GetHeader (..), Header)
-import           Ouroboros.Consensus.BlockchainTime (SlotLength, getSlotLength)
-import           Ouroboros.Consensus.Ledger.SupportsMempool (ApplyTxErr, GenTx)
-import           Ouroboros.Consensus.Node.NetworkProtocolVersion (HasNetworkProtocolVersion (..),
-                     supportedNodeToClientVersions)
-import           Ouroboros.Consensus.Node.ProtocolInfo (pClientInfoCodecConfig)
-import           Ouroboros.Network.AnchoredFragment (Anchor, AnchoredFragment)
-import           Ouroboros.Network.Block (BlockNo, HasHeader, Point, Tip)
-import           Ouroboros.Network.Magic (NetworkMagic)
-import           Ouroboros.Network.Point (WithOrigin (..), fromWithOrigin)
 import           Prelude (String, error, show)
 
 import qualified Data.Map.Strict as Map
 import qualified Ouroboros.Network.AnchoredFragment as AF
-import qualified Ouroboros.Network.Block as Block
 
 -- | The chairman checks for consensus and progress.
 --
@@ -119,7 +108,7 @@ deriveProgressThreshold _ _ (Just progressThreshold) = progressThreshold
 
 -- If only the progress threshold is not specified, derive it from the running time
 deriveProgressThreshold slotLength runningTime Nothing =
-  Block.BlockNo (floor (runningTime / getSlotLengthDiffTime slotLength) - 2)
+  BlockNo (floor (runningTime / getSlotLengthDiffTime slotLength) - 2)
 
 
 getSlotLengthDiffTime :: SlotLength -> DiffTime
@@ -177,18 +166,18 @@ consensusCondition (SecurityParam securityParam) chains =
           Just ((peerid1, peerid2), (intersection, tip1, tip2)) ->
             Left $
               ConsensusFailure
-                (peerid1, AF.anchorToTip tip1)
-                (peerid2, AF.anchorToTip tip2)
+                (peerid1, anchorToTip tip1)
+                (peerid2, anchorToTip tip2)
                 intersection
                 (SecurityParam securityParam)
           Nothing ->
             Right $
               ConsensusSuccess
                 -- the minimum intersection point:
-                (minimumBy (comparing AF.anchorToBlockNo)
+                (minimumBy (comparing anchorToBlockNo)
                            [ intersection | (_,(intersection,_,_)) <- forks ])
                 -- all the chain tips:
-                [ (peerid, AF.anchorToTip (AF.headAnchor chain))
+                [ (peerid, anchorToTip (headAnchor chain))
                 | (peerid, chain) <- Map.toList chains ]
   where
     chainForkPoints
@@ -200,15 +189,15 @@ consensusCondition (SecurityParam securityParam) chains =
          , Anchor (Header blk) -- tip of c2
          )
     chainForkPoints chain1 chain2 =
-      case AF.intersect chain1 chain2 of
+      case intersect chain1 chain2 of
         -- chains are anochored at the genesis, so their intersection is never
         -- empty
         Nothing -> error "chainChains: invariant violation"
 
         Just (_, _, extension1, extension2) ->
-          ( AF.anchor     extension1
-          , AF.headAnchor extension1
-          , AF.headAnchor extension2
+          ( anchor     extension1
+          , headAnchor extension1
+          , headAnchor extension2
           )
 
     forkTooLong
@@ -226,9 +215,9 @@ consensusCondition (SecurityParam securityParam) chains =
       where
         forkLen :: Anchor (Header blk) -> Word64
         forkLen tip =
-          Block.unBlockNo $
-            fromWithOrigin 0 (AF.anchorToBlockNo tip)
-          - fromWithOrigin 0 (AF.anchorToBlockNo intersection)
+          unBlockNo $
+            fromWithOrigin 0 (anchorToBlockNo tip)
+          - fromWithOrigin 0 (anchorToBlockNo intersection)
 
 newtype ProgressSuccess = ProgressSuccess BlockNo
   deriving Show
@@ -254,7 +243,7 @@ progressCondition :: BlockNo
                   -> ConsensusSuccess blk
                   -> Either (ProgressFailure blk) ProgressSuccess
 progressCondition minBlockNo (ConsensusSuccess _ tips) =
-  case find (\(_, tip) -> Block.getTipBlockNo tip < At minBlockNo) tips of
+  case find (\(_, tip) -> getTipBlockNo tip < At minBlockNo) tips of
     Just (peerid, tip) -> Left (ProgressFailure minBlockNo peerid tip)
     Nothing            -> Right (ProgressSuccess minBlockNo)
 
@@ -274,7 +263,7 @@ runChairman
   -> IO (ChainsSnapshot blk)
 runChairman tracer cfg networkMagic securityParam runningTime socketPaths = do
     let initialChains = Map.fromList
-          [ (socketPath, AF.Empty AF.AnchorGenesis)
+          [ (socketPath, Empty AnchorGenesis)
           | socketPath <- socketPaths]
     chainsVar <- newTVarM initialChains
 
@@ -358,7 +347,7 @@ addBlock
     -> blk
     -> STM m ()
 addBlock sockPath chainsVar blk =
-    modifyTVar chainsVar (Map.adjust (AF.addBlock (getHeader blk)) sockPath)
+    modifyTVar chainsVar (Map.adjust (Shelley.addBlock (getHeader blk)) sockPath)
 
 -- | Rollback a single block.  If the rollback point is not found, we simply
 -- error.  It should never happen if the security parameter is set up correctly.
@@ -374,7 +363,7 @@ rollback sockPath chainsVar p = modifyTVar chainsVar (Map.adjust fn sockPath)
     p' = coerce p
 
     fn :: AnchoredFragment (Header blk) -> AnchoredFragment (Header blk)
-    fn cf = case AF.rollback p' cf of
+    fn cf = case Shelley.rollback p' cf of
       Nothing  -> error "rollback error: rollback beyond chain fragment"
       Just cf' -> cf'
 
@@ -402,7 +391,7 @@ chainSyncClient tracer sockPath chainsVar securityParam = ChainSyncClient $ pure
   -- synchronises from the genesis block.  A real implementation should send
   -- a list of points up to a point which is k blocks deep.
   SendMsgFindIntersect
-    [Block.genesisPoint]
+    [genesisPoint]
     ClientStIntersect
     { recvMsgIntersectFound    = \_ _ -> ChainSyncClient (pure clientStIdle)
     , recvMsgIntersectNotFound = \  _ -> ChainSyncClient (pure clientStIdle)

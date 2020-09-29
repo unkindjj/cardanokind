@@ -20,13 +20,8 @@ module Cardano.Tracing.Kernel
 import           Cardano.Prelude hiding (atomically)
 
 import           Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import           Shelley.Spec.Ledger.BaseTypes (StrictMaybe (..), fromSMaybe)
 
-import           Ouroboros.Consensus.Node (NodeKernel (..))
-import           Ouroboros.Consensus.Util.Orphans ()
-
-import           Ouroboros.Network.NodeToClient (LocalConnectionId)
-import           Ouroboros.Network.NodeToNode (RemoteConnectionId)
+import           Cardano.Api.Shelley
 
 
 newtype NodeKernelData blk =

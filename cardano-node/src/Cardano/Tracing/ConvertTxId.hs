@@ -12,15 +12,13 @@ import           Cardano.Prelude hiding (All)
 
 import           Data.SOP.Strict
 
-import           Cardano.Api.Byron
+import           Cardano.Api.Byron hiding (txId)
+import           Cardano.Api.Shelley hiding (TxId, txId)
 import qualified Cardano.Crypto.Hash as Crypto
 import qualified Cardano.Crypto.Hashing as Byron.Crypto
-import           Ouroboros.Consensus.Byron.Ledger.Mempool (TxId (..))
-import           Ouroboros.Consensus.HardFork.Combinator
+import           Ouroboros.Consensus.HardFork.Combinator.Mempool (TxId (..))
 import           Ouroboros.Consensus.Ledger.SupportsMempool (GenTx)
-import           Ouroboros.Consensus.Shelley.Ledger.Block (ShelleyBlock)
 import           Ouroboros.Consensus.Shelley.Ledger.Mempool (TxId (..))
-import           Ouroboros.Consensus.TypeFamilyWrappers
 import qualified Shelley.Spec.Ledger.TxBody as Shelley
 
 -- | Convert a transaction ID to raw bytes.

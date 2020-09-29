@@ -26,18 +26,11 @@ import           Control.Monad.Trans.Except (ExceptT)
 import           Control.Monad.Trans.Except.Extra (firstExceptT)
 import qualified Data.Text as T
 
-import qualified Cardano.Chain.Update as Byron
+import           Cardano.Api.Byron
+import           Cardano.Api.Shelley
 
-import           Ouroboros.Consensus.Cardano hiding (Protocol)
+import           Ouroboros.Consensus.Cardano (Protocol (ProtocolCardano))
 import qualified Ouroboros.Consensus.Cardano as Consensus
-import qualified Ouroboros.Consensus.Cardano.CanHardFork as Consensus
-import           Ouroboros.Consensus.HardFork.Combinator.Condense ()
-
-import           Ouroboros.Consensus.Cardano.Block (CardanoBlock)
-import           Ouroboros.Consensus.Cardano.Condense ()
-
-import           Ouroboros.Consensus.Shelley.Protocol (StandardCrypto)
-import qualified Shelley.Spec.Ledger.PParams as Shelley
 
 import           Cardano.Node.Types
 
@@ -135,22 +128,22 @@ mkConsensusProtocolCardano NodeByronProtocolConfiguration {
         Shelley.readLeaderCredentials files
 
     return $!
-      Consensus.ProtocolCardano
+      ProtocolCardano
         -- Byron parameters
         byronGenesis
         (PBftSignatureThreshold <$> npcByronPbftSignatureThresh)
-        (Byron.ProtocolVersion npcByronSupportedProtocolVersionMajor
-                               npcByronSupportedProtocolVersionMinor
-                               npcByronSupportedProtocolVersionAlt)
-        (Byron.SoftwareVersion npcByronApplicationName
-                               npcByronApplicationVersion)
+        (ProtocolVersion npcByronSupportedProtocolVersionMajor
+                         npcByronSupportedProtocolVersionMinor
+                         npcByronSupportedProtocolVersionAlt)
+        (SoftwareVersion npcByronApplicationName
+                         npcByronApplicationVersion)
         byronLeaderCredentials
 
         -- Shelley parameters
         shelleyGenesis
         (Shelley.genesisHashToPraosNonce shelleyGenesisHash)
-        (Shelley.ProtVer npcShelleySupportedProtocolVersionMajor
-                         npcShelleySupportedProtocolVersionMinor)
+        (ProtVer npcShelleySupportedProtocolVersionMajor
+                 npcShelleySupportedProtocolVersionMinor)
         (MaxMajorProtVer npcShelleyMaxSupportedProtocolVersion)
         shelleyLeaderCredentials
 
@@ -170,12 +163,12 @@ mkConsensusProtocolCardano NodeByronProtocolConfiguration {
            -- But we also provide an override to allow for simpler test setups
            -- such as triggering at the 0 -> 1 transition .
            --
-           Nothing -> Consensus.TriggerHardForkAtVersion
+           Nothing -> TriggerHardForkAtVersion
                         (maybe 2 fromIntegral npcTestShelleyHardForkAtVersion)
 
            -- Alternatively, for testing we can transition at a specific epoch.
            --
-           Just epochNo -> Consensus.TriggerHardForkAtEpoch epochNo)
+           Just epochNo -> TriggerHardForkAtEpoch epochNo)
 
 
 ------------------------------------------------------------------------------

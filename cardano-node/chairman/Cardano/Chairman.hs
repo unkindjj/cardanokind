@@ -34,7 +34,7 @@ import           Control.Tracer
 import           Network.Mux (MuxError, MuxMode (..))
 
 import           Cardano.API
-import           Cardano.Api.Shelley
+import           Cardano.Api.Shelley hiding (Protocol, addBlock, rollback)
 
 import qualified Ouroboros.Network.AnchoredFragment as AF
 
@@ -173,18 +173,18 @@ consensusCondition (SecurityParam securityParam) chains =
           Just ((peerid1, peerid2), (intersection, tip1, tip2)) ->
             Left $
               ConsensusFailure
-                (peerid1, AF.anchorToTip tip1)
-                (peerid2, AF.anchorToTip tip2)
+                (peerid1, anchorToTip tip1)
+                (peerid2, anchorToTip tip2)
                 intersection
                 (SecurityParam securityParam)
           Nothing ->
             Right $
               ConsensusSuccess
                 -- the minimum intersection point:
-                (minimumBy (comparing AF.anchorToBlockNo)
+                (minimumBy (comparing anchorToBlockNo)
                            [ intersection | (_,(intersection,_,_)) <- forks ])
                 -- all the chain tips:
-                [ (peerid, AF.anchorToTip (AF.headAnchor chain))
+                [ (peerid, anchorToTip (headAnchor chain))
                 | (peerid, chain) <- Map.toList chains ]
   where
     chainForkPoints :: HasHeader (Header blk)
@@ -194,15 +194,15 @@ consensusCondition (SecurityParam securityParam) chains =
                         Anchor (Header blk), -- tip of c1
                         Anchor (Header blk)) -- tip of c2
     chainForkPoints chain1 chain2 =
-      case AF.intersect chain1 chain2 of
+      case intersect chain1 chain2 of
         -- chains are anchored at the genesis, so their intersection is never
         -- empty
         Nothing -> error "chainChains: invariant violation"
 
         Just (_, _, extension1, extension2) ->
-          (AF.anchor     extension1,
-           AF.headAnchor extension1,
-           AF.headAnchor extension2)
+          (anchor     extension1,
+           headAnchor extension1,
+           headAnchor extension2)
 
     forkTooLong :: (Anchor (Header blk), -- intersection
                     Anchor (Header blk), -- tip of chain1
@@ -218,8 +218,8 @@ consensusCondition (SecurityParam securityParam) chains =
         forkLen :: Anchor (Header blk) -> Word64
         forkLen tip =
           unBlockNo $
-            fromWithOrigin 0 (AF.anchorToBlockNo tip)
-          - fromWithOrigin 0 (AF.anchorToBlockNo intersection)
+            fromWithOrigin 0 (anchorToBlockNo tip)
+          - fromWithOrigin 0 (anchorToBlockNo intersection)
 
 
 newtype ProgressSuccess = ProgressSuccess BlockNo
@@ -265,7 +265,7 @@ runChairman :: RunNode blk
             -> IO (ChainsSnapshot blk)
 runChairman tracer cfg networkMagic securityParam runningTime socketPaths = do
 
-    let initialChains = Map.fromList [ (socketPath, AF.Empty AF.AnchorGenesis)
+    let initialChains = Map.fromList [ (socketPath, Empty AnchorGenesis)
                                      | socketPath <- socketPaths]
     chainsVar <- newTVarM initialChains
 

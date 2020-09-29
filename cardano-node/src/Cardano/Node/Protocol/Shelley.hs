@@ -34,27 +34,17 @@ import           Control.Monad.Trans.Except.Extra (firstExceptT, handleIOExceptT
 
 import qualified Cardano.Crypto.Hash.Class as Crypto
 
-import qualified Ouroboros.Consensus.Cardano as Consensus
-import           Ouroboros.Consensus.Cardano.ShelleyHFC
-
-import           Ouroboros.Consensus.Shelley.Node (MaxMajorProtVer (..), Nonce (..), ShelleyGenesis,
-                     TPraosLeaderCredentials (..))
-import           Ouroboros.Consensus.Shelley.Protocol (StandardShelley, TPraosCanBeLeader (..))
-
-import           Shelley.Spec.Ledger.Genesis (ValidationErr (..), describeValidationErr,
-                     validateGenesis)
-import           Shelley.Spec.Ledger.Keys (coerceKeyRole)
-import           Shelley.Spec.Ledger.PParams (ProtVer (..))
-
-import           Cardano.Api.Shelley hiding (FileError (..))
+import           Cardano.Api.Byron (Protocol)
+import           Cardano.Api.Shelley hiding (FileError (..), Protocol)
 import qualified Cardano.Api.Shelley as Api
+import           Ouroboros.Consensus.Cardano (Protocol (ProtocolShelley))
 
 import           Cardano.Node.Types
 
 import           Cardano.Tracing.OrphanInstances.HardFork ()
 import           Cardano.Tracing.OrphanInstances.Shelley ()
 
-import           Cardano.Node.Protocol.Types
+import           Cardano.Node.Protocol.Types (SomeConsensusProtocol (SomeConsensusProtocol))
 
 ------------------------------------------------------------------------------
 -- Shelley protocol
@@ -87,8 +77,8 @@ mkConsensusProtocolShelley
   :: NodeShelleyProtocolConfiguration
   -> Maybe ProtocolFilepaths
   -> ExceptT ShelleyProtocolInstantiationError IO
-             (Consensus.Protocol IO (ShelleyBlockHFC StandardShelley)
-                                 Consensus.ProtocolShelley)
+             (Protocol IO (ShelleyBlockHFC StandardShelley)
+                                 ProtocolShelley)
 mkConsensusProtocolShelley NodeShelleyProtocolConfiguration {
                             npcShelleyGenesisFile,
                             npcShelleyGenesisFileHash,
@@ -103,7 +93,7 @@ mkConsensusProtocolShelley NodeShelleyProtocolConfiguration {
     optionalLeaderCredentials <- readLeaderCredentials files
 
     return $
-      Consensus.ProtocolShelley
+      ProtocolShelley
         genesis
         (genesisHashToPraosNonce genesisHash)
         (ProtVer npcShelleySupportedProtocolVersionMajor

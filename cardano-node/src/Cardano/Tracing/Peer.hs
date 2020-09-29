@@ -25,25 +25,14 @@ import           Cardano.BM.Data.Tracer (emptyObject, mkObject)
 import           Cardano.BM.Trace (appendName, traceNamedObject)
 import           Cardano.BM.Tracing
 
-import           Ouroboros.Consensus.Block (Header)
-import           Ouroboros.Consensus.Node (NodeKernel (..), remoteAddress)
-import           Ouroboros.Consensus.Util.Orphans ()
-
-import qualified Ouroboros.Network.AnchoredFragment as Net
-import           Ouroboros.Network.Block (unSlotNo)
-import qualified Ouroboros.Network.Block as Net
-import qualified Ouroboros.Network.BlockFetch.ClientRegistry as Net
-import           Ouroboros.Network.BlockFetch.ClientState (PeerFetchInFlight (..),
-                     PeerFetchStatus (..), readFetchClientState)
-import           Ouroboros.Network.NodeToClient (LocalConnectionId)
-import           Ouroboros.Network.NodeToNode (RemoteConnectionId)
+import           Cardano.Api.Shelley
 
 import           Cardano.Tracing.Kernel
 
 data Peer blk =
   Peer
   !RemoteConnectionId
-  !(Net.AnchoredFragment (Header blk))
+  !(AnchoredFragment (Header blk))
   !(PeerFetchStatus (Header blk))
   !(PeerFetchInFlight (Header blk))
   deriving (Generic)
@@ -69,9 +58,9 @@ ppInFlight f = printf
  (Set.size $ peerFetchBlocksInFlight f)
  (peerFetchBytesInFlight f)
 
-ppMaxSlotNo :: Net.MaxSlotNo -> String
-ppMaxSlotNo Net.NoMaxSlotNo = "???"
-ppMaxSlotNo (Net.MaxSlotNo x) = show (unSlotNo x)
+ppMaxSlotNo :: MaxSlotNo -> String
+ppMaxSlotNo NoMaxSlotNo = "???"
+ppMaxSlotNo (MaxSlotNo x) = show (unSlotNo x)
 
 ppStatus :: PeerFetchStatus header -> String
 ppStatus PeerFetchStatusShutdown = "shutdown"
@@ -89,8 +78,8 @@ getCurrentPeers nkd = mapNodeKernelDataIO extractPeers nkd
   tuple3pop (a, b, _) = (a, b)
 
   getCandidates
-    :: STM.StrictTVar IO (Map peer (STM.StrictTVar IO (Net.AnchoredFragment (Header blk))))
-    -> STM.STM IO (Map peer (Net.AnchoredFragment (Header blk)))
+    :: STM.StrictTVar IO (Map peer (STM.StrictTVar IO (AnchoredFragment (Header blk))))
+    -> STM.STM IO (Map peer (AnchoredFragment (Header blk)))
   getCandidates var = STM.readTVar var >>= traverse STM.readTVar
 
   extractPeers :: NodeKernel IO RemoteConnectionId LocalConnectionId blk
@@ -98,7 +87,7 @@ getCurrentPeers nkd = mapNodeKernelDataIO extractPeers nkd
   extractPeers kernel = do
     peerStates <- fmap tuple3pop <$> (   STM.atomically
                                        . (>>= traverse readFetchClientState)
-                                       . Net.readFetchClientsStateVars
+                                       . readFetchClientsStateVars
                                        . getFetchClientRegistry $ kernel
                                      )
     candidates <- STM.atomically . getCandidates . getNodeCandidates $ kernel

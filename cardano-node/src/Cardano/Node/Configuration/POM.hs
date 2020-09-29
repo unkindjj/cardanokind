@@ -29,12 +29,12 @@ import           Options.Applicative
 import           System.FilePath (takeDirectory, (</>))
 import           System.Posix.Types (Fd (..))
 
+import           Cardano.Api.Shelley hiding (Protocol (..))
 import qualified Cardano.Chain.Update as Byron
 import           Cardano.Crypto (RequiresNetworkMagic (..))
 import           Cardano.Node.Protocol.Types (Protocol (..))
 import           Cardano.Node.Types
 import           Cardano.Tracing.Config
-import           Ouroboros.Network.Block (MaxSlotNo (..))
 
 data NodeConfiguration
   = NodeConfiguration

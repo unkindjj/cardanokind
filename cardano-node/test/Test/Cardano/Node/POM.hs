@@ -7,10 +7,10 @@ module Test.Cardano.Node.POM
 
 import           Cardano.Prelude
 
+import           Cardano.Api.Shelley
 import           Cardano.Node.Configuration.POM
 import           Cardano.Node.Types
 import           Cardano.Tracing.Config (TraceOptions (..))
-import           Ouroboros.Network.Block (MaxSlotNo (..), SlotNo (..))
 
 import           Hedgehog (Property, discover, (===))
 import qualified Hedgehog

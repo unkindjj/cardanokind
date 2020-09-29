@@ -18,7 +18,7 @@ import qualified Options.Applicative as Opt
 import qualified Options.Applicative.Help as OptI
 import           System.Posix.Types (Fd (..))
 
-import           Ouroboros.Network.Block (MaxSlotNo (..), SlotNo (..))
+import           Cardano.Api.Shelley (MaxSlotNo (..), SlotNo (..))
 
 import           Cardano.Node.Configuration.POM (PartialNodeConfiguration (..), lastOption)
 import           Cardano.Node.Types

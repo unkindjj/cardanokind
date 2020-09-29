@@ -26,27 +26,10 @@ import qualified Cardano.Crypto.Hash.Class as Crypto
 import           Cardano.Tracing.OrphanInstances.Common
 import           Cardano.Tracing.OrphanInstances.Consensus ()
 
-import           Cardano.Slotting.Slot (EpochSize (..))
-import           Ouroboros.Consensus.Block (BlockProtocol, CannotForge,
-                     ForgeStateInfo, ForgeStateUpdateError)
-import           Ouroboros.Consensus.BlockchainTime (getSlotLength)
-import           Ouroboros.Consensus.Cardano.Condense ()
-import           Ouroboros.Consensus.HardFork.Combinator
-import           Ouroboros.Consensus.HardFork.Combinator.AcrossEras (EraMismatch (..),
-                     OneEraCannotForge (..), OneEraEnvelopeErr (..), OneEraLedgerError (..),
-                     OneEraLedgerUpdate (..), OneEraLedgerWarning (..), OneEraValidationErr (..),
-                     PerEraForgeStateInfo (..), PerEraForgeStateUpdateError (..), mkEraMismatch)
-import           Ouroboros.Consensus.HardFork.Combinator.Condense ()
-import           Ouroboros.Consensus.HardFork.History.EraParams (EraParams (..), SafeBeforeEpoch,
-                     SafeZone)
-import           Ouroboros.Consensus.HeaderValidation (OtherHeaderEnvelopeError)
-import           Ouroboros.Consensus.Ledger.Abstract (LedgerError)
-import           Ouroboros.Consensus.Ledger.Inspect (LedgerUpdate, LedgerWarning)
+import           Cardano.Api.Shelley hiding (TxId, ValidationErr)
+
 import           Ouroboros.Consensus.Ledger.SupportsMempool (ApplyTxErr, GenTx, TxId)
 import           Ouroboros.Consensus.Protocol.Abstract (ValidationErr)
-import           Ouroboros.Consensus.TypeFamilyWrappers
-import           Ouroboros.Consensus.Util.Condense (Condense (..))
-import qualified Ouroboros.Consensus.Util.OptNP as OptNP
 
 
 --
@@ -335,7 +318,7 @@ instance All (ToObject `Compose` WrapForgeStateInfo) xs => ToObject (PerEraForge
             . hcollapse
             . hcmap (Proxy @ (ToObject `Compose` WrapForgeStateInfo))
                     (K . fmap (toObject verb) . unComp)
-            . OptNP.toNP
+            . toNP
             . getPerEraForgeStateInfo
             $ forgeStateInfo
 
@@ -363,7 +346,7 @@ instance All (ToObject `Compose` WrapForgeStateUpdateError) xs => ToObject (PerE
             . hcollapse
             . hcmap (Proxy @ (ToObject `Compose` WrapForgeStateUpdateError))
                     (K . fmap (toObject verb) . unComp)
-            . OptNP.toNP
+            . toNP
             . getPerEraForgeStateUpdateError
             $ forgeStateUpdateError
 

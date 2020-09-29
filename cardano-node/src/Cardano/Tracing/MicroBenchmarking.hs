@@ -35,11 +35,7 @@ import           Cardano.BM.Tracing
 
 import           Control.Tracer.Transformers.ObserveOutcome
 
-import           Ouroboros.Network.Block (SlotNo (..))
-
-import           Ouroboros.Consensus.Ledger.SupportsMempool (GenTx, GenTxId, HasTxId, txId)
-import           Ouroboros.Consensus.Mempool.API (MempoolSize (..), TraceEventMempool (..))
-import           Ouroboros.Consensus.Node.Tracers (TraceForgeEvent (..))
+import           Cardano.Api.Shelley
 
 --------------------------------------------------------------------------------
 -- Measure transaction forging time

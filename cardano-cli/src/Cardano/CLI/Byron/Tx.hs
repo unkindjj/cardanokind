@@ -44,7 +44,7 @@ import           Cardano.Crypto (ProtocolMagicId, SigningKey (..))
 import qualified Cardano.Crypto.Hashing as Crypto
 import qualified Cardano.Crypto.Signing as Crypto
 
-import           Cardano.Api.Byron
+import           Cardano.Api.Byron hiding (TxId)
 import           Cardano.CLI.Environment
 import           Cardano.CLI.Types (SocketPath (..))
 

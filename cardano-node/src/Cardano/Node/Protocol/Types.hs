@@ -17,9 +17,9 @@ import           Cardano.Prelude
 import           Control.Monad.Fail (fail)
 import           Data.Aeson
 
-import           Ouroboros.Consensus.Block (BlockProtocol)
-import qualified Ouroboros.Consensus.Cardano as Consensus (Protocol)
-import           Ouroboros.Consensus.Node.Run (RunNode)
+--import           Cardano.Api.Byron (Protocol)
+import qualified Cardano.Api.Byron as Byron
+import           Cardano.Api.Shelley hiding (Protocol (..))
 
 import           Cardano.Tracing.Constraints (TraceConstraints)
 import           Cardano.Tracing.Metrics (HasKESMetricsData)
@@ -58,5 +58,5 @@ type SomeConsensusProtocolConstraints blk =
 data SomeConsensusProtocol where
 
      SomeConsensusProtocol :: SomeConsensusProtocolConstraints blk
-                           => Consensus.Protocol IO blk (BlockProtocol blk)
+                           => Byron.Protocol IO blk (BlockProtocol blk)
                            -> SomeConsensusProtocol

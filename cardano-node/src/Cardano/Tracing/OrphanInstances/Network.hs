@@ -23,34 +23,15 @@ import           Cardano.Tracing.ConvertTxId (ConvertTxId)
 import           Cardano.Tracing.OrphanInstances.Common
 import           Cardano.Tracing.Render
 
-import           Ouroboros.Consensus.Block (ConvertRawHash (..), getHeader)
-import           Ouroboros.Consensus.Ledger.SupportsMempool (GenTx, HasTxs (..), txId)
-import           Ouroboros.Consensus.Node.Run (RunNode (..))
-import           Ouroboros.Network.Block
-import           Ouroboros.Network.BlockFetch.ClientState (TraceFetchClientState (..),
-                     TraceLabelPeer (..))
-import           Ouroboros.Network.BlockFetch.Decision (FetchDecision, FetchDecline (..))
-import           Ouroboros.Network.Codec (AnyMessage (..))
-import           Ouroboros.Network.KeepAlive (TraceKeepAliveClient)
+import           Cardano.Api.Shelley
+
 import qualified Ouroboros.Network.NodeToClient as NtC
-import           Ouroboros.Network.NodeToNode (ErrorPolicyTrace (..), TraceSendRecv (..),
-                     WithAddr (..))
 import qualified Ouroboros.Network.NodeToNode as NtN
 import           Ouroboros.Network.Protocol.BlockFetch.Type (BlockFetch, Message (..))
-import           Ouroboros.Network.Protocol.ChainSync.Type (ChainSync)
 import qualified Ouroboros.Network.Protocol.ChainSync.Type as ChainSync
-import           Ouroboros.Network.Protocol.LocalStateQuery.Type (LocalStateQuery)
 import qualified Ouroboros.Network.Protocol.LocalStateQuery.Type as LocalStateQuery
-import           Ouroboros.Network.Protocol.LocalTxSubmission.Type (LocalTxSubmission)
 import qualified Ouroboros.Network.Protocol.LocalTxSubmission.Type as LocalTxSub
-import           Ouroboros.Network.Protocol.TxSubmission.Type (Message (..), TxSubmission)
-import           Ouroboros.Network.Snocket (LocalAddress (..))
-import           Ouroboros.Network.Subscription (ConnectResult (..), DnsTrace (..),
-                     SubscriberError (..), SubscriptionTrace (..), WithDomainName (..),
-                     WithIPList (..))
-import           Ouroboros.Network.TxSubmission.Inbound (TraceTxSubmissionInbound (..))
-import           Ouroboros.Network.TxSubmission.Outbound (TraceTxSubmissionOutbound (..))
-
+import qualified Ouroboros.Network.Protocol.TxSubmission.Type as TxSub
 {- HLINT ignore "Use record patterns" -}
 
 --
@@ -435,19 +416,19 @@ instance ToObject (AnyMessage (LocalTxSubmission tx err)) where
     mkObject [ "kind" .= String "MsgDone" ]
 
 instance ToObject (AnyMessage (ChainSync blk tip)) where
-   toObject _verb (AnyMessage ChainSync.MsgRequestNext{}) =
+   toObject _verb (AnyMessage MsgRequestNext{}) =
      mkObject [ "kind" .= String "MsgRequestNext" ]
-   toObject _verb (AnyMessage ChainSync.MsgAwaitReply{}) =
+   toObject _verb (AnyMessage MsgAwaitReply{}) =
      mkObject [ "kind" .= String "MsgAwaitReply" ]
-   toObject _verb (AnyMessage ChainSync.MsgRollForward{}) =
+   toObject _verb (AnyMessage MsgRollForward{}) =
      mkObject [ "kind" .= String "MsgRollForward" ]
-   toObject _verb (AnyMessage ChainSync.MsgRollBackward{}) =
+   toObject _verb (AnyMessage MsgRollBackward{}) =
      mkObject [ "kind" .= String "MsgRollBackward" ]
-   toObject _verb (AnyMessage ChainSync.MsgFindIntersect{}) =
+   toObject _verb (AnyMessage MsgFindIntersect{}) =
      mkObject [ "kind" .= String "MsgFindIntersect" ]
-   toObject _verb (AnyMessage ChainSync.MsgIntersectFound{}) =
+   toObject _verb (AnyMessage MsgIntersectFound{}) =
      mkObject [ "kind" .= String "MsgIntersectFound" ]
-   toObject _verb (AnyMessage ChainSync.MsgIntersectNotFound{}) =
+   toObject _verb (AnyMessage MsgIntersectNotFound{}) =
      mkObject [ "kind" .= String "MsgIntersectNotFound" ]
    toObject _verb (AnyMessage ChainSync.MsgDone{}) =
      mkObject [ "kind" .= String "MsgDone" ]
@@ -509,7 +490,7 @@ instance (Show txid, Show tx)
     mkObject
       [ "kind" .= String "MsgReplyTxIds"
       ]
-  toObject _verb (AnyMessage MsgDone) =
+  toObject _verb (AnyMessage TxSub.MsgDone) =
     mkObject
       [ "kind" .= String "MsgDone"
       ]
