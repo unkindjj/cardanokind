@@ -228,6 +228,8 @@ module Cardano.Api.Typed (
     writeFileTextEnvelope,
     readTextEnvelopeFromFile,
     readTextEnvelopeOfTypeFromFile,
+    textEnvelopeToJSON,
+
     -- *** Reading one of several key types
     FromSomeType(..),
     deserialiseFromTextEnvelopeAnyOf,
@@ -3117,7 +3119,11 @@ writeFileTextEnvelope path mbDescr a =
     runExceptT $ do
       handleIOExceptT (FileIOError path) $ BS.writeFile path content
   where
-    content = LBS.toStrict $ encodePretty' TextView.textViewJSONConfig (serialiseToTextEnvelope mbDescr a) <> "\n"
+    content = LBS.toStrict $ textEnvelopeToJSON mbDescr a
+
+textEnvelopeToJSON :: HasTextEnvelope a =>  Maybe TextEnvelopeDescr -> a -> LBS.ByteString
+textEnvelopeToJSON mbDescr a  =
+  encodePretty' TextView.textViewJSONConfig (serialiseToTextEnvelope mbDescr a) <> "\n"
 
 readFileTextEnvelope :: HasTextEnvelope a
                      => AsType a

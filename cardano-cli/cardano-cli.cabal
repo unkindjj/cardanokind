@@ -154,6 +154,9 @@ test-suite cardano-cli-test
   hs-source-dirs:       test
   main-is:              cardano-cli-test.hs
   type:                 exitcode-stdio-1.0
+  if !os(windows)
+      build-depends:     unix
+      other-modules:     Test.Cli.FilePermissions
 
   build-depends:        base
                       , aeson
@@ -162,6 +165,7 @@ test-suite cardano-cli-test
                       , base16-bytestring
                       , cardano-api
                       , cardano-cli
+                      , cardano-node
                       , cardano-prelude
                       , containers
                       , deepseq

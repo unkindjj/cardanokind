@@ -1,8 +1,30 @@
+{-# LANGUAGE CPP #-}
+
+#if !defined(mingw32_HOST_OS)
+#define UNIX
+#endif
+
 module Cardano.CLI.Shelley.Run.Node
   ( ShelleyNodeCmdError
   , renderShelleyNodeCmdError
   , runNodeCmd
   ) where
+
+import           Cardano.Prelude hiding ((<.>))
+import           Prelude (id)
+
+import           Control.Monad.Trans.Except (ExceptT)
+import           Control.Monad.Trans.Except.Extra (firstExceptT, hoistEither, newExceptT)
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.Text as Text
+#ifdef UNIX
+import qualified Control.Exception as Exception
+import qualified Data.ByteString.Lazy as LBS
+import           System.Directory (removeFile, renameFile)
+import           System.FilePath.Posix (splitFileName, (<.>))
+import           System.IO (hClose, openTempFile)
+import           System.Posix.Files (ownerModes, setFileMode)
+#endif
 
 import           Cardano.Api.TextView (TextViewDescription (..))
 import           Cardano.Api.Typed
@@ -10,13 +32,6 @@ import           Cardano.CLI.Shelley.Commands
 import           Cardano.CLI.Shelley.Key (InputDecodeError, VerificationKeyOrFile,
                      readSigningKeyFileAnyOf, readVerificationKeyOrFile)
 import           Cardano.CLI.Types (SigningKeyFile (..), VerificationKeyFile (..))
-import           Cardano.Prelude
-import           Control.Monad.Trans.Except (ExceptT)
-import           Control.Monad.Trans.Except.Extra (firstExceptT, hoistEither, newExceptT)
-import           Prelude (id)
-
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.Text as Text
 
 {- HLINT ignore "Reduce duplication" -}
 
@@ -25,11 +40,20 @@ data ShelleyNodeCmdError
   | ShelleyNodeCmdReadKeyFileError !(FileError InputDecodeError)
   | ShelleyNodeCmdWriteFileError !(FileError ())
   | ShelleyNodeCmdOperationalCertificateIssueError !OperationalCertIssueError
+  | ShelleyNodeCmdVrfSigningKeyCreationError
+      FilePath
+      -- ^ Target path
+      FilePath
+      -- ^ Temp path
   deriving Show
 
 renderShelleyNodeCmdError :: ShelleyNodeCmdError -> Text
 renderShelleyNodeCmdError err =
   case err of
+    ShelleyNodeCmdVrfSigningKeyCreationError targetPath tempPath ->
+      Text.pack $ "Error creating VRF signing key file. Target path: " <> targetPath
+      <> " Temporary path: " <> tempPath
+
     ShelleyNodeCmdReadFileError fileErr -> Text.pack (displayError fileErr)
 
     ShelleyNodeCmdReadKeyFileError fileErr -> Text.pack (displayError fileErr)
@@ -100,15 +124,18 @@ runNodeKeyGenKES (VerificationKeyFile vkeyPath) (SigningKeyFile skeyPath) = do
     skeyDesc = TextViewDescription "KES Signing Key"
     vkeyDesc = TextViewDescription "KES Verification Key"
 
-
 runNodeKeyGenVRF :: VerificationKeyFile -> SigningKeyFile
                  -> ExceptT ShelleyNodeCmdError IO ()
 runNodeKeyGenVRF (VerificationKeyFile vkeyPath) (SigningKeyFile skeyPath) = do
     skey <- liftIO $ generateSigningKey AsVrfKey
     let vkey = getVerificationKey skey
-    firstExceptT ShelleyNodeCmdWriteFileError
+#ifdef UNIX
+    writeTextEnvelopeFileWithOwnerPermissions skeyPath (Just skeyDesc) skey
+#else
+   firstExceptT ShelleyNodeCmdWriteFileError
       . newExceptT
       $ writeFileTextEnvelope skeyPath (Just skeyDesc) skey
+#endif
     firstExceptT ShelleyNodeCmdWriteFileError
       . newExceptT
       $ writeFileTextEnvelope vkeyPath (Just vkeyDesc) vkey
@@ -244,3 +271,25 @@ readColdVerificationKeyOrFile coldVerKeyOrFile =
         , FromSomeType (AsVerificationKey AsGenesisDelegateKey) castVerificationKey
         ]
         fp
+
+#ifdef UNIX
+writeTextEnvelopeFileWithOwnerPermissions
+  :: HasTextEnvelope a
+  => FilePath
+  -> Maybe TextEnvelopeDescr
+  -> a
+  -> ExceptT ShelleyNodeCmdError IO ()
+writeTextEnvelopeFileWithOwnerPermissions targetPath mbDescr a = do
+  let content = textEnvelopeToJSON mbDescr a
+      (targetDir, targetFile) = splitFileName targetPath
+  liftIO $ Exception.bracketOnError
+             (openTempFile targetDir $ targetFile <.> "tmp")
+             (\(tmpPath, fHandle) -> do
+               hClose fHandle >> removeFile tmpPath
+               return $ ShelleyNodeCmdVrfSigningKeyCreationError targetPath tmpPath)
+             (\(tmpPath, fHandle) -> do
+                 LBS.hPut fHandle content
+                 hClose fHandle
+                 renameFile tmpPath targetPath
+                 setFileMode targetPath ownerModes)
+#endif

@@ -29,6 +29,7 @@ golden_shelleyGenesisKeyDelegationCertificate =
     genesisDelegVerKeyFilePath <-
       noteTempFile tempDir "genesis-delegate-verification-key-file"
     vrfVerKeyFilePath <- noteTempFile tempDir "vrf-verification-key-file"
+    vrfSignKeyFilePath <- noteTempFile tempDir "vrf-signing-key-file"
     genesisKeyDelegCertFilePath <-
       noteTempFile tempDir "genesis-key-delegation-certificate-file"
 
@@ -51,7 +52,7 @@ golden_shelleyGenesisKeyDelegationCertificate =
     void $ execCardanoCLI
       [ "shelley","node","key-gen-VRF"
       , "--verification-key-file", vrfVerKeyFilePath
-      , "--signing-key-file", "/dev/null"
+      , "--signing-key-file", vrfSignKeyFilePath
       ]
 
     H.assertFilesExist
