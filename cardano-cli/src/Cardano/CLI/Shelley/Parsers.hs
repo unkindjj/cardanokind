@@ -16,8 +16,8 @@ module Cardano.CLI.Shelley.Parsers
 import           Cardano.Prelude hiding (All, Any, option)
 import           Prelude (String)
 
-import           Cardano.Api.Typed hiding (PoolId)
 import           Cardano.Api.Protocol (Protocol (..))
+import           Cardano.Api.Typed hiding (PoolId)
 
 import           Cardano.Chain.Slotting (EpochSlots (..))
 import           Cardano.CLI.Shelley.Commands
@@ -630,7 +630,10 @@ pPoolCmd =
       ]
   where
     pId :: Parser PoolCmd
-    pId = PoolGetId <$> pStakePoolVerificationKeyOrFile <*> pOutputFormat
+    pId =
+      PoolGetId
+        <$> pStakePoolVerificationKeyOrFile
+        <*> pMaybeOutputFile
 
     pPoolMetaDataHashSubCmd :: Parser PoolCmd
     pPoolMetaDataHashSubCmd = PoolMetaDataHash <$> pPoolMetaDataFile <*> pMaybeOutputFile
@@ -1139,17 +1142,6 @@ pOperatorCertIssueCounterFile =
         (  Opt.long "operational-certificate-issue-counter"
         <> Opt.internal
         )
-    )
-
-
-pOutputFormat :: Parser OutputFormat
-pOutputFormat =
-  Opt.option readOutputFormat
-    (  Opt.long "output-format"
-    <> Opt.metavar "STRING"
-    <> Opt.help "Optional output format. Accepted output formats are \"hex\" \
-                \and \"bech32\" (default is \"bech32\")."
-    <> Opt.value OutputFormatBech32
     )
 
 
@@ -2258,17 +2250,6 @@ readVerificationKey asType =
     deserialiseFromBech32OrHex str =
       first (Text.unpack . renderInputDecodeError) $
         deserialiseInput (AsVerificationKey asType) keyFormats (BSC.pack str)
-
-readOutputFormat :: Opt.ReadM OutputFormat
-readOutputFormat = do
-  s <- Opt.str
-  case s of
-    "hex" -> pure OutputFormatHex
-    "bech32" -> pure OutputFormatBech32
-    _ ->
-      fail $ "Invalid output format: \""
-        <> s
-        <> "\". Accepted output formats are \"hex\" and \"bech32\"."
 
 readURIOfMaxLength :: Int -> Opt.ReadM URI
 readURIOfMaxLength maxLen = do

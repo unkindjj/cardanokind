@@ -48,8 +48,8 @@ module Cardano.CLI.Shelley.Commands
 import           Data.Text (Text)
 import           Prelude
 
-import           Cardano.Api.Typed hiding (PoolId)
 import           Cardano.Api.Protocol (Protocol)
+import           Cardano.Api.Typed hiding (PoolId)
 
 import           Ouroboros.Consensus.BlockchainTime (SystemStart (..))
 
@@ -249,7 +249,7 @@ data PoolCmd
       EpochNo
       -- ^ Epoch in which to retire the stake pool.
       OutputFile
-  | PoolGetId (VerificationKeyOrFile StakePoolKey) OutputFormat
+  | PoolGetId (VerificationKeyOrFile StakePoolKey) (Maybe OutputFile)
   | PoolMetaDataHash PoolMetaDataFile (Maybe OutputFile)
   deriving (Eq, Show)
 
