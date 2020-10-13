@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Cardano.CLI.Shelley.Run.Address
@@ -19,10 +20,11 @@ import           Control.Monad.Trans.Except.Extra (firstExceptT, handleIOExceptT
 
 import           Cardano.Api.Typed
 
-import           Cardano.CLI.Shelley.Key (InputDecodeError, VerificationKeyOrFile,
-                     VerificationKeyTextOrFile, VerificationKeyTextOrFileError (..),
-                     readVerificationKeyOrFile, readVerificationKeyTextOrFileAnyOf,
-                     renderVerificationKeyTextOrFileError)
+import           Cardano.CLI.Shelley.Key (InputDecodeError, OutputDirection (..),
+                     VerificationKeyOrFile, VerificationKeyTextOrFile,
+                     VerificationKeyTextOrFileError (..), readVerificationKeyOrFile,
+                     readVerificationKeyTextOrFileAnyOf, renderVerificationKeyTextOrFileError,
+                     serialiseInputToBech32AndWrite)
 import           Cardano.CLI.Shelley.Parsers (AddressCmd (..), AddressKeyType (..), OutputFile (..))
 import           Cardano.CLI.Shelley.Run.Address.Info (ShelleyAddressInfoError, runAddressInfo)
 import           Cardano.CLI.Types
@@ -74,14 +76,14 @@ runAddressKeyGen kt (VerificationKeyFile vkeyPath) (SigningKeyFile skeyPath) =
       let vkey = getVerificationKey skey
       firstExceptT ShelleyAddressCmdWriteFileError
         . newExceptT
-        $ writeFileTextEnvelope skeyPath (Just skeyDesc) skey
+        $ serialiseInputToBech32AndWrite
+            (OutputDirectionFile skeyPath)
+            skey
       firstExceptT ShelleyAddressCmdWriteFileError
         . newExceptT
-        $ writeFileTextEnvelope vkeyPath (Just vkeyDesc) vkey
-
-    skeyDesc, vkeyDesc :: TextEnvelopeDescr
-    skeyDesc = "Payment Signing Key"
-    vkeyDesc = "Payment Verification Key"
+        $ serialiseInputToBech32AndWrite
+            (OutputDirectionFile vkeyPath)
+            vkey
 
 
 runAddressKeyHash :: VerificationKeyTextOrFile
