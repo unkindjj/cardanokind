@@ -838,6 +838,7 @@ pGenesisCmd =
         <*> pNetworkId
         <*> pBulkPoolCredFiles
         <*> pBulkPoolsPerFile
+        <*> pStuffedUtxoCount
 
     pGenesisHash :: Parser GenesisCmd
     pGenesisHash =
@@ -895,6 +896,15 @@ pGenesisCmd =
           (  Opt.long "gen-stake-delegs"
           <> Opt.metavar "INT"
           <> Opt.help "The number of stake delegator credential sets to make [default is 0]."
+          <> Opt.value 0
+          )
+
+    pStuffedUtxoCount :: Parser Word
+    pStuffedUtxoCount =
+        Opt.option Opt.auto
+          (  Opt.long "num-stuffed-utxo"
+          <> Opt.metavar "INT"
+          <> Opt.help "The number of fake UTxO entries to generate [default is 0]."
           <> Opt.value 0
           )
 

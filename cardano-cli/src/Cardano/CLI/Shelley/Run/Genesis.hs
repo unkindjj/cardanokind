@@ -2,6 +2,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
@@ -65,6 +67,10 @@ import           Cardano.CLI.Shelley.Run.StakeAddress
                     renderShelleyStakeAddressCmdError, runStakeAddressKeyGen)
 import           Cardano.CLI.Types
 
+import qualified Test.QuickCheck as QuickCheck
+import           Test.QuickCheck (arbitrary)
+import           Test.Shelley.Spec.Ledger.Serialisation.Generators()
+
 {- HLINT ignore "Reduce duplication" -}
 
 data ShelleyGenesisCmdError
@@ -126,7 +132,7 @@ runGenesisCmd (GenesisVerKey vk sk) = runGenesisVerKey vk sk
 runGenesisCmd (GenesisTxIn vk nw mOutFile) = runGenesisTxIn vk nw mOutFile
 runGenesisCmd (GenesisAddr vk nw mOutFile) = runGenesisAddr vk nw mOutFile
 runGenesisCmd (GenesisCreate gd gn un ms am nw) = runGenesisCreate gd gn un ms am nw
-runGenesisCmd (GenesisCreateStaked gd gn gp gl un ms am ds nw bf bp) = runGenesisCreateStaked gd gn gp gl un ms am ds nw bf bp
+runGenesisCmd (GenesisCreateStaked gd gn gp gl un ms am ds nw bf bp su) = runGenesisCreateStaked gd gn gp gl un ms am ds nw bf bp su
 runGenesisCmd (GenesisHashFile gf) = runGenesisHashFile gf
 
 --
@@ -331,7 +337,7 @@ runGenesisCreate (GenesisDir rootdir)
   utxoAddrs <- readInitialFundAddresses utxodir network
   start <- maybe (SystemStart <$> getCurrentTimePlus30) pure mStart
 
-  let finalGenesis = updateTemplate start genDlgs mAmount utxoAddrs mempty (Lovelace 0) [] template
+  let finalGenesis = updateTemplate start genDlgs mAmount utxoAddrs mempty (Lovelace 0) [] [] template
 
   writeShelleyGenesis (rootdir </> "genesis.json") finalGenesis
   where
@@ -352,11 +358,12 @@ runGenesisCreateStaked ::
   -> NetworkId
   -> Word           -- ^ bulk credential files to write
   -> Word           -- ^ pool credentials per bulk file
+  -> Word           -- ^ num stuffed UTxO entries
   -> ExceptT ShelleyGenesisCmdError IO ()
 runGenesisCreateStaked (GenesisDir rootdir)
                  genNumGenesisKeys genNumUTxOKeys genNumPools genNumStDelegs
                  mStart mNonDlgAmount stDlgAmount network
-                 bulkPoolCredFiles bulkPoolsPerFile = do
+                 bulkPoolCredFiles bulkPoolsPerFile numStuffedUtxo = do
   liftIO $ do
     createDirectoryIfMissing False rootdir
     createDirectoryIfMissing False gendir
@@ -407,9 +414,12 @@ runGenesisCreateStaked (GenesisDir rootdir)
   nonDelegAddrs <- readInitialFundAddresses utxodir network
   start <- maybe (SystemStart <$> getCurrentTimePlus30) pure mStart
 
+  stuffedUtxoAddrs <- liftIO $ replicateM (fromIntegral numStuffedUtxo) $
+                      genStuffedAddress
+
   let poolMap = Map.fromList $ mkDelegationMapEntry <$> delegations
       delegAddrs = dInitialUtxoAddr <$> delegations
-      finalGenesis = updateTemplate start genDlgs mNonDlgAmount nonDelegAddrs poolMap stDlgAmount delegAddrs template
+      finalGenesis = updateTemplate start genDlgs mNonDlgAmount nonDelegAddrs poolMap stDlgAmount delegAddrs stuffedUtxoAddrs template
 
   writeShelleyGenesis (rootdir </> "genesis.json") finalGenesis
   liftIO $ Text.putStrLn $ mconcat $
@@ -440,6 +450,15 @@ runGenesisCreateStaked (GenesisDir rootdir)
     pooldir  = rootdir </> "pools"
     stdeldir = rootdir </> "stake-delegator-keys"
     utxodir  = rootdir </> "utxo-keys"
+
+    genStuffedAddress :: IO (Address Shelley)
+    genStuffedAddress = QuickCheck.generate $
+       -- Sparse collision space:
+       QuickCheck.resize (fromIntegral numStuffedUtxo * 1000000) $
+        (ShelleyAddress
+          <$> pure Ledger.Testnet
+          <*> arbitrary
+          <*> pure Ledger.StakeRefNull)
 
 -- -------------------------------------------------------------------------------------------------
 
@@ -668,11 +687,12 @@ updateTemplate
     -> Map (Ledger.KeyHash 'Ledger.Staking StandardShelley) (Ledger.PoolParams StandardShelley)
     -> Lovelace
     -> [Address Shelley]
+    -> [Address Shelley]
     -> ShelleyGenesis StandardShelley
     -> ShelleyGenesis StandardShelley
 updateTemplate (SystemStart start)
                genDelegMap mAmountNonDeleg utxoAddrsNonDeleg
-               poolSpecs (Lovelace amountDeleg) utxoAddrsDeleg
+               poolSpecs (Lovelace amountDeleg) utxoAddrsDeleg stuffedUtxoAddrs
                template =
     template
       { sgSystemStart = start
@@ -682,7 +702,8 @@ updateTemplate (SystemStart start)
                           [ (toShelleyAddr addr, toShelleyLovelace v)
                           | (addr, v) <-
                             distribute nonDelegCoin utxoAddrsNonDeleg ++
-                            distribute delegCoin    utxoAddrsDeleg ]
+                            distribute delegCoin    utxoAddrsDeleg ++
+                            mkStuffedUtxo stuffedUtxoAddrs ]
       , sgStaking =
         ShelleyGenesisStaking
           { sgsPools = Map.fromList
@@ -712,6 +733,10 @@ updateTemplate (SystemStart start)
          | rest > splitThreshold =
              ((addr, Lovelace coinPerAddr) : acc, rest - coinPerAddr)
          | otherwise = ((addr, Lovelace rest) : acc, 0)
+
+    mkStuffedUtxo :: [Address Shelley] -> [(Address Shelley, Lovelace)]
+    mkStuffedUtxo xs = (, Lovelace minUtxoVal) <$> xs
+      where (Coin minUtxoVal) = _minUTxOValue $ sgProtocolParams template
 
     shelleyDelKeys =
       Map.fromList
