@@ -23,15 +23,14 @@ import qualified Data.Text.Encoding as Text
 
 import           Cardano.Tracing.OrphanInstances.Common
 import           Cardano.Tracing.OrphanInstances.Network ()
-import           Cardano.Tracing.Render (renderChainHash, renderChunkNo,
-                     renderHeaderHash, renderHeaderHashForVerbosity,
-                     renderPoint, renderPointAsPhrase, renderPointForVerbosity,
-                     renderRealPointAsPhrase, renderTipForVerbosity,
-                     renderTipBlockNo, renderTipHash, renderWithOrigin)
+import           Cardano.Tracing.Render (renderChainHash, renderChunkNo, renderHeaderHash,
+                     renderHeaderHashForVerbosity, renderPoint, renderPointAsPhrase,
+                     renderPointForVerbosity, renderRealPointAsPhrase, renderTipBlockNo,
+                     renderTipForVerbosity, renderTipHash, renderWithOrigin)
 
 import           Ouroboros.Consensus.Block (BlockProtocol, CannotForge, ConvertRawHash (..),
-                     ForgeStateUpdateError, Header, RealPoint, getHeader, headerPoint,
-                     realPointHash, realPointSlot)
+                     ForgeStateUpdateError, Header, RealPoint, headerPoint, realPointHash,
+                     realPointSlot)
 import           Ouroboros.Consensus.HeaderValidation
 import           Ouroboros.Consensus.Ledger.Abstract
 import           Ouroboros.Consensus.Ledger.Extended
@@ -46,7 +45,7 @@ import           Ouroboros.Consensus.MiniProtocol.ChainSync.Client (TraceChainSy
 import           Ouroboros.Consensus.MiniProtocol.ChainSync.Server (TraceChainSyncServerEvent (..))
 import           Ouroboros.Consensus.MiniProtocol.LocalTxSubmission.Server
                      (TraceLocalTxSubmissionServerEvent (..))
-import           Ouroboros.Consensus.Node.Run (RunNode (..))
+import           Ouroboros.Consensus.Node.Run (RunNode)
 import           Ouroboros.Consensus.Node.Tracers (TraceForgeEvent (..))
 import           Ouroboros.Consensus.Protocol.Abstract
 import qualified Ouroboros.Consensus.Protocol.BFT as BFT
@@ -1067,7 +1066,7 @@ instance ( tx ~ GenTx blk
           (Proxy @blk)
           MaximalVerbosity
           (blockHash blk)
-      , "blockSize" .= toJSON (nodeBlockFetchSize (getHeader blk))
+--      , "blockSize" .= toJSON (nodeBlockFetchSize (getHeader blk))
       , "txIds" .= toJSON (map (show . txId) txs)
       ]
   toObject verb (TraceAdoptedBlock slotNo blk _txs) =
@@ -1078,7 +1077,7 @@ instance ( tx ~ GenTx blk
           (Proxy @blk)
           verb
           (blockHash blk)
-      , "blockSize" .= toJSON (nodeBlockFetchSize (getHeader blk))
+  --    , "blockSize" .= toJSON (nodeBlockFetchSize (getHeader blk))
       ]
 
 

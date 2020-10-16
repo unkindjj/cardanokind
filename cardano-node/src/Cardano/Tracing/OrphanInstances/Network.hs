@@ -24,9 +24,9 @@ import           Cardano.Tracing.ConvertTxId (ConvertTxId)
 import           Cardano.Tracing.OrphanInstances.Common
 import           Cardano.Tracing.Render
 
-import           Ouroboros.Consensus.Block (ConvertRawHash (..), getHeader)
+import           Ouroboros.Consensus.Block (ConvertRawHash (..))
 import           Ouroboros.Consensus.Ledger.SupportsMempool (GenTx, HasTxs (..), txId)
-import           Ouroboros.Consensus.Node.Run (RunNode (..))
+import           Ouroboros.Consensus.Node.Run (RunNode)
 import           Ouroboros.Network.Block
 import           Ouroboros.Network.BlockFetch.ClientState (TraceFetchClientState (..),
                      TraceLabelPeer (..))
@@ -386,7 +386,7 @@ instance ( ConvertTxId blk
   toObject MaximalVerbosity (AnyMessageAndAgency _ (MsgBlock blk)) =
     mkObject [ "kind" .= String "MsgBlock"
              , "blockHash" .= renderHeaderHash (Proxy @blk) (blockHash blk)
-             , "blockSize" .= toJSON (nodeBlockFetchSize (getHeader blk))
+           --  , "blockSize" .= toJSON (nodeBlockFetchSize (getHeader blk))
              , "txIds" .= toJSON (presentTx <$> extractTxs blk)
              ]
       where
@@ -396,7 +396,7 @@ instance ( ConvertTxId blk
   toObject _v (AnyMessageAndAgency _ (MsgBlock blk)) =
     mkObject [ "kind" .= String "MsgBlock"
              , "blockHash" .= renderHeaderHash (Proxy @blk) (blockHash blk)
-             , "blockSize" .= toJSON (nodeBlockFetchSize (getHeader blk))
+          --   , "blockSize" .= toJSON (nodeBlockFetchSize (getHeader blk))
              ]
   toObject _v (AnyMessageAndAgency _ MsgRequestRange{}) =
     mkObject [ "kind" .= String "MsgRequestRange" ]
@@ -554,6 +554,7 @@ instance ToObject (TraceFetchClientState header) where
     mkObject [ "kind" .= String "StartedFetchBatch" ]
   toObject _verb RejectedFetchBatch {} =
     mkObject [ "kind" .= String "RejectedFetchBatch" ]
+  toObject _ _ = mkObject []
 
 
 instance Show peer
@@ -604,6 +605,7 @@ instance (Show txid, Show tx)
     mkObject
       [ "kind" .= String "TraceTxSubmissionOutboundSendMsgReplyTxs"
       ]
+  toObject _ _ = mkObject []
 
 
 instance Show remotePeer => ToObject (TraceKeepAliveClient remotePeer) where
