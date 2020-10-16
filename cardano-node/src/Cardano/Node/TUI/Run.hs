@@ -1,4 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-local-binds #-}
 
 module Cardano.Node.TUI.Run
     ( LiveViewBackend (..)
@@ -68,8 +71,8 @@ captureCounters lvbe trace0 = do
     -- start capturing counters on this process
     thr <- Async.async $ forever $ do
                 threadDelay 1000000   -- 1 second
-                cts <- readCounters (ObservableTraceSelf counters)
-                traceCounters trace' cts
+                -- cts <- readCounters (ObservableTraceSelf counters)
+                -- traceCounters trace' cts
 
     modifyMVar_ (getbe lvbe) $ \lvs -> return $ lvs { lvsMetricsThread = LiveViewThread $ Just thr }
     where
