@@ -467,6 +467,8 @@ import qualified Cardano.Chain.UTxO as Byron
 import           Ouroboros.Consensus.Shelley.Eras (StandardShelley)
 import           Ouroboros.Consensus.Shelley.Protocol.Crypto (StandardCrypto)
 
+import qualified Cardano.Ledger.ShelleyMA.Timelocks as MA -- TODO: Not exposed in cardano-ledger-specs
+
 import qualified Cardano.Ledger.Crypto as Shelley (DSIGN, KES, VRF)
 
 import qualified Shelley.Spec.Ledger.Address as Shelley
@@ -1646,6 +1648,47 @@ data MultiSigScript = RequireSignature (Hash PaymentKey)
                     | RequireAnyOf [MultiSigScript]
                     | RequireMOf Int [MultiSigScript]
   deriving (Eq, Show)
+
+
+
+
+Hierarchy:
+
+Timelock era
+|
+|
+|
+Shelley.MultiSig
+
+Old:
+newtype Script = Script (Shelley.Script StandardShelley)
+
+New:
+newtype ScriptEra = ScriptEra (MA.Timelock' era)
+
+makeScriptEra :: TimeLockedScript -> ScriptEra era
+makeScriptEra = ScriptEra . go
+  where
+    go :: TimeLockedScript -> MA.Timelock' era
+    go (ScriptMultiSig s f) = MA.Multi $ makeMulti ms
+    go (ScriptTimeLockInterval ms) = MA.Interval s f
+    go (ScriptTimeLockAnd locks) = MA.TimelockAnd' (map go locks)
+    go (ScriptTimeLockOr locks) = MA.TimelockOr' (map go locks)
+
+class TimeLockedScript era where
+  ScriptMultiSig :: MultiSigScript -> TimeLockedScript era
+  ScriptTimeLockInterval
+    :: !(StrictMaybe SlotNo)
+    -> !(StrictMaybe SlotNo)
+    -> TimeLockedScript era
+  ScriptTimeLockAnd :: !(StrictSeq (Timelock era)) -> TimeLockedScript era
+  ScriptTimeLockOr :: !(StrictSeq (Timelock era)) -> TimeLockedScript era
+
+makeMulti :: MultiSigScript -> Shelley.MultiSig era
+makeMulti (RequireSignature (PaymentKeyHash kh)) = Shelley.RequireSignature (Shelley.coerceKeyRole kh)
+makeMulti (RequireAllOf s) = Shelley.RequireAllOf (map go s)
+makeMulti (RequireAnyOf s) = Shelley.RequireAnyOf (map go s)
+makeMulti (RequireMOf m s) = Shelley.RequireMOf m (map go s)
 
 instance ToJSON MultiSigScript where
   toJSON (RequireSignature pKeyHash) =
