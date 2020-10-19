@@ -251,6 +251,7 @@ instance ToObject ProcessStats where
     mkObject $
       [ "kind"     .= String "resourceStats"
       , "ticksCpu" .= toJSON (psCentiSecsCpu commonStats)
+      , "ticksGc"  .= toJSON (psCentiSecsGC  commonStats)
       , "rss"      .= toJSON (psRSS          commonStats)
       ] ++ case commonStats of
              linux@ProcessStatsLinux{} ->

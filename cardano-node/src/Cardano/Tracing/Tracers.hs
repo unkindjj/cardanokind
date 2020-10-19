@@ -442,7 +442,10 @@ mkConsensusTracers trSel verb tr nodeKern fStats = do
     , Consensus.mempoolTracer = tracerOnOff' (traceMempool trSel) $ mempoolTracer trSel tr fStats
     , Consensus.forgeTracer = tracerOnOff' (traceForge trSel) $
         Tracer $ \tlcev@(Consensus.TraceLabelCreds _ ev) -> do
-          traceWith (forgeTracer verb tr forgeTracers nodeKern fStats) tlcev
+          traceWith (annotateSeverity
+                     $ traceLeadershipChecks forgeTracers nodeKern verb
+                     $ appendName "LeadershipCheck" tr) tlcev
+          traceWith (forgeTracer verb tr forgeTracers fStats) tlcev
           -- Don't track credentials in ForgeTime.
           traceWith (blockForgeOutcomeExtractor
                     $ toLogObject' verb
@@ -473,7 +476,7 @@ mkConsensusTracers trSel verb tr nodeKern fStats = do
        <*> counting (liftCounting staticMeta name "slot-is-immutable" tr)
        <*> counting (liftCounting staticMeta name "node-is-leader" tr)
 
-teeForge ::
+traceLeadershipChecks ::
   forall blk
   . ( Consensus.RunNode blk
      , LedgerQueries blk
@@ -488,7 +491,42 @@ teeForge ::
   -> TracingVerbosity
   -> Trace IO Text
   -> Tracer IO (WithSeverity (Consensus.TraceLabelCreds (Consensus.TraceForgeEvent blk)))
-teeForge ft nodeKern tverb tr = Tracer $
+traceLeadershipChecks ft nodeKern tverb tr = Tracer $
+  \(WithSeverity sev (Consensus.TraceLabelCreds creds event)) ->
+    case event of
+      Consensus.TraceStartLeadershipCheck slot -> do
+        !utxoSize <- mapNodeKernelDataIO nkUtxoSize nodeKern
+        meta <- mkLOMeta sev Public
+        traceNamedObject tr
+          ( meta
+          , LogStructured $ Map.fromList $
+            [("kind", String "TraceStartLeadershipCheck")
+            ,("credentials", String creds)
+            ,("slot", toJSON $ unSlotNo slot)]
+            ++ fromSMaybe [] ((:[]) . ("utxoSize",) . toJSON <$> utxoSize))
+      _ -> pure ()
+ where
+   nkUtxoSize
+     :: NodeKernel IO RemoteConnectionId LocalConnectionId blk -> IO Int
+   nkUtxoSize NodeKernel{getChainDB} =
+     atomically (ChainDB.getCurrentLedger getChainDB)
+     <&> ledgerUtxoSize . ledgerState
+
+teeForge ::
+  forall blk
+  . ( Consensus.RunNode blk
+     , LedgerQueries blk
+     , ToObject (CannotForge blk)
+     , ToObject (LedgerErr (LedgerState blk))
+     , ToObject (OtherHeaderEnvelopeError blk)
+     , ToObject (ValidationErr (BlockProtocol blk))
+     , ToObject (ForgeStateUpdateError blk)
+     )
+  => ForgeTracers
+  -> TracingVerbosity
+  -> Trace IO Text
+  -> Tracer IO (WithSeverity (Consensus.TraceLabelCreds (Consensus.TraceForgeEvent blk)))
+teeForge ft tverb tr = Tracer $
  \ev@(WithSeverity sev (Consensus.TraceLabelCreds creds event)) -> do
   flip traceWith (WithSeverity sev event) $ fanning $ \(WithSeverity _ e) ->
     case e of
@@ -509,23 +547,8 @@ teeForge ft nodeKern tverb tr = Tracer $
       Consensus.TraceForgedInvalidBlock{} -> teeForge' (ftForgedInvalid ft)
       Consensus.TraceAdoptedBlock{} -> teeForge' (ftAdopted ft)
   case event of
-    Consensus.TraceStartLeadershipCheck slot -> do
-      !utxoSize <- mapNodeKernelDataIO nkUtxoSize nodeKern
-      meta <- mkLOMeta sev Public
-      traceNamedObject tr
-        ( meta
-        , LogStructured $ Map.fromList $
-          [("kind", String "TraceStartLeadershipCheck")
-          ,("credentials", String creds)
-          ,("slot", toJSON $ unSlotNo slot)]
-          ++ fromSMaybe [] ((:[]) . ("utxoSize",) . toJSON <$> utxoSize))
+    Consensus.TraceStartLeadershipCheck slot -> pure ()
     _ -> traceWith (toLogObject' tverb tr) ev
- where
-   nkUtxoSize
-     :: NodeKernel IO RemoteConnectionId LocalConnectionId blk -> IO Int
-   nkUtxoSize NodeKernel{getChainDB} =
-     atomically (ChainDB.getCurrentLedger getChainDB)
-     <&> ledgerUtxoSize . ledgerState
 
 teeForge'
   :: Trace IO Text
@@ -580,18 +603,17 @@ forgeTracer
   => TracingVerbosity
   -> Trace IO Text
   -> ForgeTracers
-  -> NodeKernelData blk
   -> ForgingStats
   -> Tracer IO (Consensus.TraceLabelCreds (Consensus.TraceForgeEvent blk))
-forgeTracer verb tr forgeTracers nodeKern fStats =
+forgeTracer verb tr forgeTracers fStats =
   Tracer $ \tlcev@(Consensus.TraceLabelCreds _ ev) -> do
     -- Ignoring the credentials label for measurement and counters:
     -- traceWith (measureTxsEnd tr) ev
     traceWith (notifyBlockForging fStats tr) ev
     -- Consensus tracer -- here we track the label:
-    -- traceWith (annotateSeverity
-    --              $ teeForge forgeTracers nodeKern verb
-    --              $ appendName "Forge" tr) tlcev
+    traceWith (annotateSeverity
+                 $ teeForge forgeTracers verb
+                 $ appendName "Forge" tr) tlcev
 
 notifyBlockForging
   :: ForgingStats
@@ -600,7 +622,6 @@ notifyBlockForging
 notifyBlockForging fStats tr = Tracer $ \case
   Consensus.TraceStartLeadershipCheck slot -> do
     tid <- myThreadId
-    traceM ("CHECK," <> show tid <> "," <> show (unSlotNo slot))
     hasMissed <-
       mapForgingCurrentThreadStats slot fStats $ \fts ->
         if ftsLastSlot fts == 0 || succ (ftsLastSlot fts) == slot then
