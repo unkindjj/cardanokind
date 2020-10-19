@@ -23,7 +23,7 @@ import qualified Data.ByteString.Lazy as LBS
 import           System.Directory (removeFile, renameFile)
 import           System.FilePath.Posix (splitFileName, (<.>))
 import           System.IO (hClose, openTempFile)
-import           System.Posix.Files (ownerModes, setFileMode)
+import           System.Posix.Files (ownerModes, setFileMode, nullFileMode)
 #endif
 
 import           Cardano.Api.TextView (TextViewDescription (..))
@@ -291,5 +291,6 @@ writeTextEnvelopeFileWithOwnerPermissions targetPath mbDescr a = do
                  LBS.hPut fHandle content
                  hClose fHandle
                  renameFile tmpPath targetPath
+                 setFileMode targetPath nullFileMode
                  setFileMode targetPath ownerModes)
 #endif

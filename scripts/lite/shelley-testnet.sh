@@ -7,7 +7,7 @@ ROOT="$(realpath "$(dirname "$0")/../..")"
 
 configuration="${ROOT}/scripts/lite/configuration"
 
-data_dir="$(mktemp).d"
+data_dir=shelleyscratch
 mkdir -p "${data_dir}"
 
 # Generate shelley genesis spec
@@ -75,7 +75,7 @@ for i in 1 2 3; do
 
   # Generate a KES keys
   mkdir -p "${data_dir}/node-$i"
-  cabal run exe:cardano-cli -- shelley node key-gen-KES \
+  cabal run exec:cardano-cli -- shelley node key-gen-KES \
     --verification-key-file "${data_dir}/node-$i/kes.vkey" \
     --signing-key-file      "${data_dir}/node-$i/kes.skey"
 
@@ -89,8 +89,8 @@ for i in 1 2 3; do
   mv "${data_dir}/genesis/delegate-keys/delegate$i.vrf.vkey"  "${data_dir}/node-$i/vrf.vkey"
 
   # Set permissions for the vrf private key file: read for owner only
-  chmod gou-rwx "${data_dir}/node-$i/vrf.skey"
-  chmod u+r "${data_dir}/node-$i/vrf.skey"
+  #chmod gou-rwx "${data_dir}/node-$i/vrf.skey"
+  #chmod u+r "${data_dir}/node-$i/vrf.skey"
 
   # Issue an operational certificate:
   cabal run exe:cardano-cli -- shelley node issue-op-cert \
