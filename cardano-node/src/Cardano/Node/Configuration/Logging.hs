@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -33,8 +32,6 @@ import           Control.Exception.Safe (MonadCatch)
 import           Control.Monad.Trans.Except.Extra (catchIOExceptT)
 import           Control.Tracer
 
-import           Data.Aeson (ToJSON (..), (.=), Value(..))
-
 import           Cardano.BM.Backend.Aggregation (plugin)
 import           Cardano.BM.Backend.EKGView (plugin)
 import           Cardano.BM.Backend.Monitoring (plugin)
@@ -54,7 +51,6 @@ import           Cardano.BM.Data.LogItem (LOContent (..), LOMeta (..), LoggerNam
 import           Cardano.BM.Data.Output
 #endif
 import           Cardano.BM.Data.Severity (Severity (..))
-import           Cardano.BM.Data.Tracer (mkObject, trStructured)
 import qualified Cardano.BM.Observer.Monadic as Monadic
 import qualified Cardano.BM.Observer.STM as Stm
 import           Cardano.BM.Plugin (loadPlugin)
@@ -70,6 +66,7 @@ import           Cardano.BM.Tracing
 import           Cardano.Config.Git.Rev (gitRev)
 import           Cardano.Node.Configuration.POM (NodeConfiguration (..))
 import           Cardano.Node.Types
+import           Cardano.Tracing.OrphanInstances.Common()
 
 --------------------------------
 -- Layer
@@ -232,33 +229,13 @@ createLoggingLayer ver nodeConfig' = do
    startCapturingMetrics trace0 = do
      let trace = appendName "node-metrics" trace0
      _ <- Async.async $ forever $ do
-       stats <- readProcessStats
+       stats <- readResourceStats
        case stats of
          Nothing -> pure ()
          Just ps -> do
            traceWith (toLogObject' NormalVerbosity trace) ps
        threadDelay 1000000 -- TODO:  make configurable
      pure ()
-
-instance HasPrivacyAnnotation  ProcessStats
-instance HasSeverityAnnotation ProcessStats where
-  getSeverityAnnotation _ = Info
-instance Transformable Text IO ProcessStats where
-  trTransformer = trStructured
-
-instance ToObject ProcessStats where
-  toObject _verb commonStats =
-    mkObject $
-      [ "kind"     .= String "resourceStats"
-      , "ticksCpu" .= toJSON (psCentiSecsCpu commonStats)
-      , "ticksGc"  .= toJSON (psCentiSecsGC  commonStats)
-      , "rss"      .= toJSON (psRSS          commonStats)
-      ] ++ case commonStats of
-             linux@ProcessStatsLinux{} ->
-               [ "ticksIOWait" .= toJSON (psCentiSecsIOWait linux)
-               , "threads"     .= toJSON (psThreads linux)
-               ]
-             _ -> []
 
 shutdownLoggingLayer :: LoggingLayer -> IO ()
 shutdownLoggingLayer = shutdown . llSwitchboard
