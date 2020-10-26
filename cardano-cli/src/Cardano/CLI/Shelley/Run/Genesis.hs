@@ -389,10 +389,10 @@ runGenesisCreateStaked (GenesisDir rootdir)
     left $ ShelleyGenesisCmdTooFewPoolsForBulkCreds  genNumPools bulkPoolCredFiles bulkPoolsPerFile
   -- We generate the bulk files for the last pool indices,
   -- so that all the non-bulk pools have stable indices at beginning:
-  let bulkOffset = fromIntegral $ genNumPools - bulkPoolCredFiles * bulkPoolsPerFile
-  forM_ (zip [ 1 .. bulkPoolCredFiles ]
-             (List.chunksOf (fromIntegral bulkPoolsPerFile)
-                            [ 1 + bulkOffset .. genNumPools - bulkOffset ])) $
+  let bulkOffset  = fromIntegral $ genNumPools - bulkPoolCredFiles * bulkPoolsPerFile
+      bulkIndices :: [Word]   = [ 1 + bulkOffset .. genNumPools ]
+      bulkSlices  :: [[Word]] = List.chunksOf (fromIntegral bulkPoolsPerFile) bulkIndices
+  forM_ (zip [ 1 .. bulkPoolCredFiles ] bulkSlices) $
     uncurry (writeBulkPoolCredentials pooldir)
 
   forM_ [ 1 .. genNumStDelegs ] $ \index ->
@@ -435,7 +435,10 @@ runGenesisCreateStaked (GenesisDir rootdir)
     [ mconcat
       [ ", "
       , textShow bulkPoolCredFiles, " bulk pool credential files, "
-      , textShow bulkPoolsPerFile, " pools per bulk credential file"
+      , textShow bulkPoolsPerFile, " pools per bulk credential file, indices starting from "
+      , textShow bulkOffset, ", "
+      , textShow $ length bulkIndices, " total pools in bulk nodes, each bulk node having this many entries: "
+      , textShow $ length <$> bulkSlices
       ]
     | bulkPoolCredFiles * bulkPoolsPerFile > 0 ]
 
