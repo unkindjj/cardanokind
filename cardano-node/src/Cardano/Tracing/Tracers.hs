@@ -28,6 +28,7 @@ import           Prelude (String, show)
 import           GHC.Clock (getMonotonicTimeNSec)
 
 import           Codec.CBOR.Read (DeserialiseFailure)
+import           Control.Arrow ((***), (&&&))
 import           Data.Aeson (ToJSON (..), Value (..))
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as Text
@@ -54,7 +55,7 @@ import           Ouroboros.Consensus.BlockchainTime (SystemStart (..),
                      TraceBlockchainTimeEvent (..))
 import           Ouroboros.Consensus.HeaderValidation (OtherHeaderEnvelopeError)
 import           Ouroboros.Consensus.Ledger.Abstract (LedgerErr, LedgerState)
-import           Ouroboros.Consensus.Ledger.Extended (ledgerState)
+import           Ouroboros.Consensus.Ledger.Extended (ExtLedgerState, ledgerState)
 import           Ouroboros.Consensus.Ledger.Inspect (InspectLedger, LedgerEvent)
 import           Ouroboros.Consensus.Ledger.SupportsMempool (ApplyTxErr, GenTx, GenTxId, HasTxs)
 import           Ouroboros.Consensus.Ledger.SupportsProtocol (LedgerSupportsProtocol)
@@ -495,7 +496,11 @@ traceLeadershipChecks ft nodeKern tverb tr = Tracer $
   \(WithSeverity sev (Consensus.TraceLabelCreds creds event)) ->
     case event of
       Consensus.TraceStartLeadershipCheck slot -> do
-        !utxoSize <- mapNodeKernelDataIO nkUtxoSize nodeKern
+        !query <- mapNodeKernelDataIO
+                    (\nk ->
+                       (,) <$> nkQueryLedger (ledgerUtxoSize . ledgerState) nk
+                           <*> nkQueryChain fragmentChainDensity nk)
+                    nodeKern
         meta <- mkLOMeta sev Public
         traceNamedObject tr
           ( meta
@@ -503,14 +508,14 @@ traceLeadershipChecks ft nodeKern tverb tr = Tracer $
             [("kind", String "TraceStartLeadershipCheck")
             ,("credentials", String creds)
             ,("slot", toJSON $ unSlotNo slot)]
-            ++ fromSMaybe [] ((:[]) . ("utxoSize",) . toJSON <$> utxoSize))
+            ++ fromSMaybe []
+               (query <&>
+                 \(utxoSize, chainDensity) ->
+                   [ ("utxoSize",     toJSON utxoSize)
+                   , ("chainDensity", toJSON (fromRational chainDensity :: Float))
+                   ])
+          )
       _ -> pure ()
- where
-   nkUtxoSize
-     :: NodeKernel IO RemoteConnectionId LocalConnectionId blk -> IO Int
-   nkUtxoSize NodeKernel{getChainDB} =
-     atomically (ChainDB.getCurrentLedger getChainDB)
-     <&> ledgerUtxoSize . ledgerState
 
 teeForge ::
   forall blk
@@ -910,12 +915,17 @@ chainInformation
   -> AF.AnchoredFragment (Header blk)
   -> ChainInformation
 chainInformation newTipInfo frag = ChainInformation
-    { slots       = slotN
-    , blocks      = blockN
-    , density     = calcDensity blockD slotD
+    { slots       = unSlotNo $ fromWithOrigin 0 (AF.headSlot frag)
+    , blocks      = unBlockNo $ fromWithOrigin (BlockNo 1) (AF.headBlockNo frag)
+    , density     = fragmentChainDensity frag
     , epoch       = ChainDB.newTipEpoch newTipInfo
     , slotInEpoch = ChainDB.newTipSlotInEpoch newTipInfo
     }
+
+fragmentChainDensity ::
+  HasHeader (Header blk)
+  => AF.AnchoredFragment (Header blk) -> Rational
+fragmentChainDensity frag = calcDensity blockD slotD
   where
     calcDensity :: Word64 -> Word64 -> Rational
     calcDensity bl sl
@@ -936,7 +946,6 @@ chainInformation newTipInfo frag = ChainInformation
       -- don't let it contribute to the number of blocks
       Right 0 -> 1
       Right b -> b
-
 
 --------------------------------------------------------------------------------
 -- Trace Helpers
