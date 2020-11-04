@@ -52,11 +52,12 @@ import           Ouroboros.Consensus.Block (BlockProtocol, CannotForge, ConvertR
 import           Ouroboros.Consensus.BlockchainTime (SystemStart (..),
                      TraceBlockchainTimeEvent (..))
 import           Ouroboros.Consensus.HeaderValidation (OtherHeaderEnvelopeError)
-import           Ouroboros.Consensus.Ledger.Abstract (LedgerErr, LedgerState, Query)
+import           Ouroboros.Consensus.Ledger.Abstract (LedgerErr, LedgerState)
 import           Ouroboros.Consensus.Ledger.Extended (ledgerState)
 import           Ouroboros.Consensus.Ledger.Inspect (InspectLedger, LedgerEvent)
 import           Ouroboros.Consensus.Ledger.SupportsMempool (ApplyTxErr, GenTx, GenTxId, HasTxs)
 import           Ouroboros.Consensus.Ledger.SupportsProtocol (LedgerSupportsProtocol)
+import           Ouroboros.Consensus.Ledger.Query (Query)
 import           Ouroboros.Consensus.Mempool.API (MempoolSize (..), TraceEventMempool (..))
 import qualified Ouroboros.Consensus.Network.NodeToClient as NodeToClient
 import qualified Ouroboros.Consensus.Network.NodeToNode as NodeToNode
@@ -72,6 +73,7 @@ import           Ouroboros.Network.BlockFetch.Decision (FetchDecision, FetchDecl
 import           Ouroboros.Network.Point (fromWithOrigin, withOrigin)
 import           Ouroboros.Network.Diffusion (DiffusionTracers (..))
 import qualified Ouroboros.Network.Diffusion as Diffusion
+import           Ouroboros.Network.Protocol.LocalStateQuery.Type (ShowQuery)
 
 import qualified Ouroboros.Consensus.Storage.ChainDB as ChainDB
 import qualified Ouroboros.Consensus.Storage.LedgerDB.OnDisk as LedgerDB
@@ -417,6 +419,7 @@ mkConsensusTracers
      , ToObject (ForgeStateUpdateError blk)
      , Consensus.RunNode blk
      , HasKESMetricsData blk
+     , Show (Header blk)
      )
   => TraceSelection
   -> TracingVerbosity
@@ -790,8 +793,11 @@ forgeStateInfoTracer p _ts tracer = Tracer $ \ev -> do
 --------------------------------------------------------------------------------
 
 nodeToClientTracers'
-  :: ( Show localPeer
-     , forall result. Show (Query blk result)
+  :: ( StandardHash blk
+     , Show (ApplyTxErr blk)
+     , Show (GenTx blk)
+     , Show localPeer
+     , ShowQuery (Query blk)
      )
   => TraceSelection
   -> TracingVerbosity
@@ -815,6 +821,8 @@ nodeToNodeTracers'
   :: ( Consensus.RunNode blk
      , ConvertTxId blk
      , HasTxs blk
+     , Show blk
+     , Show (Header blk)
      , Show peer
      )
   => TraceSelection
