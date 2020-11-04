@@ -93,6 +93,7 @@ newtype PolicyId = PolicyId ScriptHash
   deriving stock (Show)
   deriving newtype (Eq, Ord, IsString)
 
+
 newtype AssetName = AssetName ByteString
   deriving stock (Show)
   deriving newtype (Eq, Ord, IsString)

@@ -59,6 +59,8 @@ library
                        Cardano.CLI.Shelley.Run.TextView
                        Cardano.CLI.Shelley.Run.Transaction
 
+                       Cardano.CLI.Mary.Parser
+
                        Cardano.CLI.TopHandler
 
   other-modules:       Paths_cardano_cli
@@ -80,7 +82,6 @@ library
                      , cardano-crypto-wrapper
                      , cardano-ledger
                      , cardano-ledger-shelley-ma
-                     -- TODO: We shouldn't be forced to import "cardano-node". Fix this.
                      , cardano-node
                      , cardano-prelude
                      , cardano-slotting
@@ -103,6 +104,7 @@ library
                      , ouroboros-consensus-cardano
                      , ouroboros-consensus-shelley
                      , ouroboros-network
+                     , parsec
                      , process
                      , scientific
                      , shelley-spec-ledger
@@ -166,6 +168,8 @@ test-suite cardano-cli-test
                       , base16-bytestring
                       , cardano-api
                       , cardano-cli
+                      , cardano-crypto-class
+                      , cardano-ledger-shelley-ma
                       , cardano-node
                       , cardano-prelude
                       , containers
@@ -176,7 +180,11 @@ test-suite cardano-cli-test
                       , hedgehog-extras
                       , lifted-base
                       , optparse-applicative
+                      , ouroboros-consensus-shelley
+                      , parsec
                       , process
+                      , shelley-spec-ledger
+                      , shelley-spec-ledger-test
                       , temporary
                       , text
                       , time
@@ -184,7 +192,9 @@ test-suite cardano-cli-test
                       , unordered-containers
 
   other-modules:        Test.Cli.FilePermissions
+                        Test.Cli.Gen
                         Test.Cli.ITN
+                        Test.Cli.MultiAssetParsing
                         Test.Cli.Pioneers.Exercise1
                         Test.Cli.Pioneers.Exercise2
                         Test.Cli.Pioneers.Exercise3
