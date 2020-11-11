@@ -365,7 +365,7 @@ instance HasSeverityAnnotation (ConnectionManagerTrace addr (ConnectionHandlerTr
       TrConnect {}              -> Debug
       TrConnectError {}         -> Warning
       TrReusedConnection {}     -> Info
-      TrConnectionFinished {}   -> Debug
+      TrConnectionTerminated {} -> Debug
       TrConnectionHandler _ ev' ->
         case ev' of
           TrHandshakeSuccess {}     -> Info
@@ -380,6 +380,7 @@ instance HasSeverityAnnotation (ConnectionManagerTrace addr (ConnectionHandlerTr
       TrImpossibleConnection {} -> Info
       TrConnectionFailure {}    -> Info
       TrConnectionNotFound {}   -> Debug
+      TrConnectionDemoted {}    -> Debug
 
 instance HasPrivacyAnnotation (ServerTrace addr versionNumber)
 instance HasSeverityAnnotation (ServerTrace addr versionNumber) where
@@ -394,8 +395,6 @@ instance HasSeverityAnnotation (ServerTrace addr versionNumber) where
       Server.Stopped {}                             -> Notice
       Server.MiniProtocolRestarted {}               -> Notice -- should be Info
       Server.MiniProtocolError {}                   -> Error
-      Server.ControlMessage {}                      -> Debug
-      Server.Debug {}                               -> Debug
 
 --
 -- | instances of @Transformable@
@@ -534,7 +533,7 @@ instance (Show addr, Show versionNumber, Show agreedOptions)
 instance (Show addr, Show versionNumber)
       => Transformable Text IO (ServerTrace addr versionNumber) where
   trTransformer = trStructuredText
-instance (Show addr, Show versionNumber)
+instance Show addr
       => HasTextFormatter (ServerTrace addr versionNumber) where
   formatText a _ = pack (show a)
 
@@ -1018,7 +1017,7 @@ instance (Show addr, Show versionNumber, Show agreedOptions, ToObject addr)
           [ "kind" .= String "ReusedConnection"
           , "remoteAddress" .= String (pack . show $ remoteAddress)
           ]
-      TrConnectionFinished connId prov ->
+      TrConnectionTerminated connId prov ->
         mkObject
           [ "kind" .= String "ConnectionFinished"
           , "connectionId" .= toObject verb connId
@@ -1061,6 +1060,11 @@ instance (Show addr, Show versionNumber, Show agreedOptions, ToObject addr)
           [ "kind" .= String "ConnectionNotFound"
           , "remoteAddress" .= String (pack . show $ remoteAddress)
           , "direction" .= String (pack . show $ dir)
+          ]
+      TrConnectionDemoted connId ->
+        mkObject
+          [ "kind" .= String "ConnectionDemoted"
+          , "connectionId" .= toObject verb connId
           ]
 
 instance (Show addr, Show versionNumber)
