@@ -64,24 +64,24 @@ genLovelace = Lovelace <$> Gen.integral (Range.linear 0 5000)
 
 -- Script Primitive Generators --
 
-genRequiredSig :: ScriptFeatureInEra SignatureFeature era -> Gen (MultiSigScript era)
+genRequiredSig :: ScriptFeatureInEra SignatureFeature era -> Gen (SimpleScript era)
 genRequiredSig sfeat = do
   verKey <- genVerificationKey AsPaymentKey
   return $ RequireSignature sfeat (verificationKeyHash verKey)
 
-genRequireTimeBefore :: ScriptFeatureInEra TimeLocksFeature era -> Gen (MultiSigScript era)
+genRequireTimeBefore :: ScriptFeatureInEra TimeLocksFeature era -> Gen (SimpleScript era)
 genRequireTimeBefore sfeat = RequireTimeBefore sfeat <$> genSlotNo
 
-genRequireTimeAfter :: ScriptFeatureInEra TimeLocksFeature era -> Gen (MultiSigScript era)
+genRequireTimeAfter :: ScriptFeatureInEra TimeLocksFeature era -> Gen (SimpleScript era)
 genRequireTimeAfter sfeat = RequireTimeAfter sfeat <$> genSlotNo
 
-genAll :: [MultiSigScript era] -> Gen (MultiSigScript era)
+genAll :: [SimpleScript era] -> Gen (SimpleScript era)
 genAll s = pure $ RequireAllOf s
 
-genAny :: [MultiSigScript era] -> Gen (MultiSigScript era)
+genAny :: [SimpleScript era] -> Gen (SimpleScript era)
 genAny s = pure $ RequireAnyOf s
 
-genMofN :: [MultiSigScript era] -> Gen (MultiSigScript era)
+genMofN :: [SimpleScript era] -> Gen (SimpleScript era)
 genMofN s = do
  let numKeys = length s
  required <- Gen.integral (Range.linear 0 numKeys)
@@ -89,10 +89,10 @@ genMofN s = do
 
 -- Shelley
 
-genMultiSigScriptShelley :: Gen (MultiSigScript Shelley)
+genMultiSigScriptShelley :: Gen (SimpleScript Shelley)
 genMultiSigScriptShelley = genMultiSigScriptsShelley >>= Gen.element
 
-genMultiSigScriptsShelley :: Gen [MultiSigScript Shelley]
+genMultiSigScriptsShelley :: Gen [SimpleScript Shelley]
 genMultiSigScriptsShelley =
   Gen.recursive Gen.choice
     -- Non-recursive generators
@@ -107,10 +107,10 @@ genMultiSigScriptsShelley =
 
 -- Allegra
 
-genMultiSigScriptAllegra :: Gen (MultiSigScript Allegra)
+genMultiSigScriptAllegra :: Gen (SimpleScript Allegra)
 genMultiSigScriptAllegra = genMultiSigScriptsAllegra >>= Gen.element
 
-genMultiSigScriptsAllegra :: Gen [MultiSigScript Allegra]
+genMultiSigScriptsAllegra :: Gen [SimpleScript Allegra]
 genMultiSigScriptsAllegra =
   Gen.recursive Gen.choice
     -- Non-recursive generators
@@ -132,10 +132,10 @@ genMultiSigScriptsAllegra =
 
 -- Mary
 
-genMultiSigScriptMary :: Gen (MultiSigScript Mary)
+genMultiSigScriptMary :: Gen (SimpleScript Mary)
 genMultiSigScriptMary = genMultiSigScriptsMary >>= Gen.element
 
-genMultiSigScriptsMary :: Gen [MultiSigScript Mary]
+genMultiSigScriptsMary :: Gen [SimpleScript Mary]
 genMultiSigScriptsMary =
   Gen.recursive Gen.choice
     -- Non-recursive generators
@@ -155,21 +155,21 @@ genMultiSigScriptsMary =
 
     ]
 
-genAllRequiredSig :: Gen (MultiSigScript Shelley)
+genAllRequiredSig :: Gen (SimpleScript Shelley)
 genAllRequiredSig =
   RequireAllOf <$> Gen.list (Range.constant 1 10) (genRequiredSig SignaturesInShelleyEra)
 
-genAnyRequiredSig :: Gen (MultiSigScript Shelley)
+genAnyRequiredSig :: Gen (SimpleScript Shelley)
 genAnyRequiredSig =
   RequireAnyOf <$> Gen.list (Range.constant 1 10) (genRequiredSig SignaturesInShelleyEra)
 
-genMofNRequiredSig :: Gen (MultiSigScript Shelley)
+genMofNRequiredSig :: Gen (SimpleScript Shelley)
 genMofNRequiredSig = do
  required <- Gen.integral (Range.linear 2 15)
  total <- Gen.integral (Range.linear (required + 1) 15)
  RequireMOf required <$> Gen.list (Range.singleton total) (genRequiredSig SignaturesInShelleyEra)
 
-genMultiSigScript :: Gen (MultiSigScript Shelley)
+genMultiSigScript :: Gen (SimpleScript Shelley)
 genMultiSigScript =
   Gen.choice [genAllRequiredSig, genAnyRequiredSig, genMofNRequiredSig]
 

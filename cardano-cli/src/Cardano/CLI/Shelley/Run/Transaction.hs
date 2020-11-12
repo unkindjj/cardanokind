@@ -317,7 +317,7 @@ data SomeWitness
   | AGenesisDelegateExtendedSigningKey
                                (Api.SigningKey Api.GenesisDelegateExtendedKey)
   | AGenesisUTxOSigningKey     (Api.SigningKey Api.GenesisUTxOKey)
-  | AShelleyMultiSigScript     (Api.MultiSigScript Shelley)
+  | AShelleyMultiSigScript     (Api.SimpleScript Shelley)
 
 -- | Error deserialising a JSON-encoded script.
 newtype ScriptJsonDecodeError = ScriptJsonDecodeError String
@@ -413,7 +413,7 @@ partitionSomeWitnesses
   :: [ByronOrShelleyWitness]
   -> ( [ShelleyBootstrapWitnessSigningKeyData]
      , [Api.ShelleyWitnessSigningKey]
-     , [Api.MultiSigScript Shelley]
+     , [Api.SimpleScript Shelley]
      )
 partitionSomeWitnesses = reversePartitionedWits . foldl' go mempty
   where
@@ -434,7 +434,7 @@ partitionSomeWitnesses = reversePartitionedWits . foldl' go mempty
 data ByronOrShelleyWitness
   = AByronWitness !ShelleyBootstrapWitnessSigningKeyData
   | AShelleyKeyWitness !Api.ShelleyWitnessSigningKey
-  | AShelleyScriptWitness !(Api.MultiSigScript Shelley)
+  | AShelleyScriptWitness !(Api.SimpleScript Shelley)
 
 categoriseSomeWitness :: SomeWitness -> ByronOrShelleyWitness
 categoriseSomeWitness swsk =

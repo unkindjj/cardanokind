@@ -65,20 +65,18 @@ import qualified Cardano.Crypto.Hash.Class as Crypto
 import           Cardano.Slotting.Slot (SlotNo)
 
 import qualified Cardano.Ledger.Core as Shelley
-import qualified Cardano.Ledger.Era  as Ledger
+import qualified Cardano.Ledger.Era as Ledger
 
 import qualified Cardano.Ledger.ShelleyMA.Timelocks as Timelock
-import           Ouroboros.Consensus.Shelley.Eras
-                   (StandardAllegra, StandardMary, StandardShelley,
-                    StandardCrypto)
+import           Ouroboros.Consensus.Shelley.Eras (StandardAllegra, StandardCrypto, StandardMary,
+                     StandardShelley)
 import           Shelley.Spec.Ledger.BaseTypes (StrictMaybe (..))
 import qualified Shelley.Spec.Ledger.Keys as Shelley
 import qualified Shelley.Spec.Ledger.Scripts as Shelley
 import qualified Shelley.Spec.Ledger.Tx as Shelley
 
-import           Cardano.Api.Eras
-                   (Shelley, Allegra, Mary,
-                    AsType (AsByron, AsShelley, AsAllegra, AsMary))
+import           Cardano.Api.Eras (Allegra, AsType (AsAllegra, AsByron, AsMary, AsShelley), Mary,
+                     Shelley)
 import           Cardano.Api.Hash
 import           Cardano.Api.HasTypeProxy
 import           Cardano.Api.KeysShelley
@@ -279,7 +277,7 @@ instance HasScriptFeatures Mary where
    hasTimeLocksFeature   = Just TimeLocksInMaryEra
 
 
---TODO: add a deprecation pragma and switch to the SimpleScript constructor
+{-# DEPRECATED MultiSigScript "Use SimpleScript instead" #-}
 makeMultiSigScript :: MultiSigScript Shelley -> Script Shelley
 makeMultiSigScript = simpleScriptToScript
 
