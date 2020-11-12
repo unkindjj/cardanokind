@@ -16,14 +16,15 @@ module Cardano.CLI.Shelley.Parsers
 import           Cardano.Prelude hiding (All, Any, option)
 import           Prelude (String)
 
+import           Cardano.Api.DeserialiseAnyOf (InputFormat (..), deserialiseInput,
+                     renderInputDecodeError)
 import           Cardano.Api.Protocol (Protocol (..))
 import           Cardano.Api.Typed hiding (PoolId)
 
 import           Cardano.Chain.Slotting (EpochSlots (..))
 import           Cardano.CLI.Shelley.Commands
-import           Cardano.CLI.Shelley.Key (InputFormat (..), VerificationKeyOrFile (..),
-                     VerificationKeyOrHashOrFile (..), VerificationKeyTextOrFile (..),
-                     deserialiseInput, renderInputDecodeError)
+import           Cardano.CLI.Shelley.Key (VerificationKeyOrFile (..),
+                     VerificationKeyOrHashOrFile (..), VerificationKeyTextOrFile (..))
 import           Cardano.CLI.Types
 import           Control.Monad.Fail (fail)
 import           Data.Attoparsec.Combinator ((<?>))

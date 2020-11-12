@@ -7,16 +7,17 @@ module Cardano.CLI.Shelley.Run.Node
 import           Cardano.Prelude hiding ((<.>))
 import           Prelude (id)
 
-import           Data.String (fromString)
 import qualified Data.ByteString.Char8 as BS
+import           Data.String (fromString)
 import qualified Data.Text as Text
 
 import           Control.Monad.Trans.Except.Extra (firstExceptT, hoistEither, newExceptT)
 
+import           Cardano.Api.DeserialiseAnyOf (InputDecodeError)
 import           Cardano.Api.Typed
 import           Cardano.CLI.Shelley.Commands
-import           Cardano.CLI.Shelley.Key (InputDecodeError, OutputDirection (..),
-                     VerificationKeyOrFile, readSigningKeyFileAnyOf, readVerificationKeyOrFile,
+import           Cardano.CLI.Shelley.Key (OutputDirection (..), VerificationKeyOrFile,
+                     readSigningKeyFileAnyOf, readVerificationKeyOrFile,
                      serialiseInputToBech32AndWrite)
 import           Cardano.CLI.Types (SigningKeyFile (..), VerificationKeyFile (..))
 
