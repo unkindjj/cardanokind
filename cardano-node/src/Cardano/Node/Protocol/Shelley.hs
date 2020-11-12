@@ -26,6 +26,7 @@ import           Prelude (String, id)
 
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as BS
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 
 import           Control.Monad.Trans.Except.Extra (firstExceptT, handleIOExceptT, hoistEither,
@@ -36,15 +37,17 @@ import qualified Cardano.Crypto.Hash.Class as Crypto
 import qualified Ouroboros.Consensus.Cardano as Consensus
 import           Ouroboros.Consensus.Cardano.ShelleyHFC
 
-import           Ouroboros.Consensus.Shelley.Node (Nonce (..),
-                     ProtocolParamsShelley (..), ShelleyGenesis, TPraosLeaderCredentials (..))
-import           Ouroboros.Consensus.Shelley.Protocol (TPraosCanBeLeader (..), StandardCrypto)
+import           Ouroboros.Consensus.Shelley.Node (Nonce (..), ProtocolParamsShelley (..),
+                     ShelleyGenesis, TPraosLeaderCredentials (..))
+import           Ouroboros.Consensus.Shelley.Protocol (StandardCrypto, TPraosCanBeLeader (..))
 
 import           Shelley.Spec.Ledger.Genesis (ValidationErr (..), describeValidationErr,
                      validateGenesis)
 import           Shelley.Spec.Ledger.Keys (coerceKeyRole)
 import           Shelley.Spec.Ledger.PParams (ProtVer (..))
 
+import           Cardano.Api.DeserialiseAnyOf (InputDecodeError, InputFormat (..),
+                     readAndDeserialiseFromFile, readAndDeserialiseFromTextEnvelopeFile)
 import           Cardano.Api.Typed hiding (FileError)
 import qualified Cardano.Api.Typed as Api (FileError)
 
@@ -158,11 +161,18 @@ readLeaderCredentials (Just ProtocolFilepaths {
                             }) = do
 
     OperationalCertificate opcert (StakePoolVerificationKey vkey) <-
-      firstExceptT FileError . newExceptT $ readFileTextEnvelope AsOperationalCertificate certFile
-    VrfSigningKey vrfKey <-
-      firstExceptT FileError . newExceptT $ readFileTextEnvelope (AsSigningKey AsVrfKey) vrfFile
-    KesSigningKey kesKey <-
-      firstExceptT FileError . newExceptT $ readFileTextEnvelope (AsSigningKey AsKesKey) kesFile
+      firstExceptT FileError . newExceptT $
+        readAndDeserialiseFromTextEnvelopeFile AsOperationalCertificate certFile
+    VrfSigningKey vrfKey <- firstExceptT FileError . newExceptT $
+      readAndDeserialiseFromFile
+        (AsSigningKey AsVrfKey)
+        (NE.fromList [InputFormatBech32, InputFormatHex, InputFormatTextEnvelope])
+        vrfFile
+    KesSigningKey kesKey <- firstExceptT FileError . newExceptT $
+      readAndDeserialiseFromFile
+        (AsSigningKey AsKesKey)
+        (NE.fromList [InputFormatBech32, InputFormatHex, InputFormatTextEnvelope])
+        kesFile
 
     return $ Just TPraosLeaderCredentials {
                tpraosLeaderCredentialsCanBeLeader =
@@ -193,7 +203,7 @@ data ShelleyProtocolInstantiationError =
      | GenesisHashMismatch !GenesisHash !GenesisHash -- actual, expected
      | GenesisDecodeError !FilePath !String
      | GenesisValidationFailure ![ValidationErr]
-     | FileError !(Api.FileError TextEnvelopeError)
+     | FileError !(Api.FileError InputDecodeError)
 --TODO: pick a less generic constructor than FileError
 
      | OCertNotSpecified
