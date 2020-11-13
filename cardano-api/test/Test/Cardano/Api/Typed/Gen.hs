@@ -1,6 +1,8 @@
 module Test.Cardano.Api.Typed.Gen
   ( genAddressByron
   , genAddressShelley
+  , genValueNestedRep
+  , genValueNestedBundle
   , genByronKeyWitness
   , genRequiredSig
   , genMofNRequiredSig
@@ -19,6 +21,7 @@ module Test.Cardano.Api.Typed.Gen
   , genTxShelley
   , genTxBodyByron
   , genTxBodyShelley
+  , genValue
   , genVerificationKey
   ) where
 
@@ -148,6 +151,49 @@ genMultiSigScriptsMary =
                       )
 
     ]
+
+genAssetName :: Gen AssetName
+genAssetName = AssetName <$> Gen.utf8 (Range.constant 1 15) Gen.alphaNum
+
+genPolicyId :: Gen PolicyId
+genPolicyId = PolicyId <$> genScriptHash
+
+genAssetId :: Gen AssetId
+genAssetId = Gen.choice [ AssetId <$> genPolicyId <*> genAssetName
+                        , return AdaAssetId
+                        ]
+genQuantity :: Gen Quantity
+genQuantity =
+  fromInteger <$> Gen.integral_ (Range.exponential 0 (toInteger (maxBound :: Int64)))
+
+genValue :: Gen Value
+genValue =
+  valueFromList <$> Gen.list (Range.constant 0 10) ((,)
+                <$> genAssetId <*> genQuantity)
+
+-- We do not generate duplicate keys as 'ValueNestedRep' is created via
+-- flattening a 'Map'
+genValueNestedRep :: Gen ValueNestedRep
+genValueNestedRep =
+  Gen.choice
+    [ ValueNestedRep <$> Gen.list (Range.singleton 1) genValueNestedBundle
+    , ValueNestedRep <$> sequenceA [genValueNestedBundle, genValueNestedBundleAda]
+    ]
+
+genValueNestedBundle :: Gen ValueNestedBundle
+genValueNestedBundle =
+  Gen.choice [ genValueNestedBundleAda
+             , genValueNestedBundleNonAda
+             ]
+
+genValueNestedBundleAda :: Gen ValueNestedBundle
+genValueNestedBundleAda = ValueNestedBundleAda <$> genQuantity
+
+genValueNestedBundleNonAda :: Gen ValueNestedBundle
+genValueNestedBundleNonAda =
+  ValueNestedBundle
+    <$> genPolicyId
+    <*> Gen.map (Range.singleton 1) ((,) <$> genAssetName <*> genQuantity)
 
 genAllRequiredSig :: Gen (MultiSigScript ShelleyEra)
 genAllRequiredSig =
@@ -363,3 +409,4 @@ genShelleyScriptWitness = makeScriptWitness
 
 genSeed :: Int -> Gen Crypto.Seed
 genSeed n = Crypto.mkSeedFromBytes <$> Gen.bytes (Range.singleton n)
+

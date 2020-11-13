@@ -128,6 +128,12 @@ module Cardano.Api.Typed (
     selectLovelace,
     lovelaceToValue,
 
+    -- ** Alternative nested representation
+    ValueNestedRep(..),
+    ValueNestedBundle(..),
+    valueToNestedRep,
+    valueFromNestedRep,
+
     -- * Building transactions
     -- | Constructing and inspecting transactions
     TxBody(..),
@@ -403,7 +409,7 @@ module Cardano.Api.Typed (
     Shelley.emptyPParams,
     Shelley.truncateUnitInterval,
     emptyGenesisStaking,
-    secondsToNominalDiffTime
+    secondsToNominalDiffTime,
   ) where
 
 import           Prelude
@@ -463,7 +469,7 @@ import qualified Cardano.Chain.Slotting as Byron
 --
 -- Shelley imports
 --
-import           Ouroboros.Consensus.Shelley.Eras (StandardAllegra, StandardShelley, StandardMary)
+import           Ouroboros.Consensus.Shelley.Eras (StandardAllegra, StandardMary, StandardShelley)
 import           Ouroboros.Consensus.Shelley.Protocol.Crypto (StandardCrypto)
 
 import qualified Shelley.Spec.Ledger.Address as Shelley
