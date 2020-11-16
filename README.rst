@@ -443,3 +443,4 @@ Validate CBOR files
 You can validate Byron era blocks, delegation certificates, txs and update proposals with the ``validate-cbor`` command.
 
 ``cabal exec cardano-cli -- validate-cbor --byron-block 21600 --filepath CBOREncodedByronBlockFile``
+
