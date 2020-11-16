@@ -119,6 +119,7 @@ data Tracers peer localPeer blk = Tracers
   , muxTracer :: Tracer IO (WithMuxBearer peer MuxTrace)
   , handshakeTracer :: Tracer IO NtN.HandshakeTr
   , localHandshakeTracer :: Tracer IO NtC.HandshakeTr
+  , textTracer :: Tracer IO Text
   }
 
 data ForgeTracers = ForgeTracers
@@ -151,6 +152,7 @@ nullTracers = Tracers
   , muxTracer = nullTracer
   , handshakeTracer = nullTracer
   , localHandshakeTracer = nullTracer
+  , textTracer = nullTracer
   }
 
 
@@ -296,6 +298,7 @@ mkTracers tOpts@(TracingOn trSel) tr nodeKern = do
     , muxTracer = tracerOnOff (traceMux trSel) verb "Mux" tr
     , handshakeTracer = tracerOnOff (traceHandshake trSel) verb "Handshake" tr
     , localHandshakeTracer = tracerOnOff (traceLocalHandshake trSel) verb "LocalHandshake" tr
+    , textTracer = tracerOnOff True verb "text" tr
     }
  where
    verb :: TracingVerbosity
@@ -341,6 +344,7 @@ mkTracers TracingOff _ _ =
     , muxTracer = nullTracer
     , handshakeTracer = nullTracer
     , localHandshakeTracer = nullTracer
+    , textTracer = nullTracer
     }
 
 --------------------------------------------------------------------------------
