@@ -33,7 +33,6 @@ import qualified Shelley.Spec.Ledger.Keys as Shelley
 import           Cardano.Api.Crypto.Ed25519Bip32 (xPrvFromBytes)
 import           Cardano.Api.Typed
 
-import           Cardano.CLI.Byron.Key (CardanoEra (..))
 import qualified Cardano.CLI.Byron.Key as Byron
 import           Cardano.CLI.Helpers (textShow)
 import           Cardano.CLI.Shelley.Commands
@@ -333,7 +332,7 @@ convertByronSigningKey mPwd byronFormat convert
 
     sk@(Crypto.SigningKey xprv) <-
       firstExceptT ShelleyKeyCmdByronKeyFailure
-        $ Byron.readEraSigningKey (toCarandoEra byronFormat) skeyPathOld
+        $ Byron.readEraSigningKey byronFormat skeyPathOld
 
     unprotectedSk <- case mPwd of
                        -- Change password to empty string
@@ -346,13 +345,6 @@ convertByronSigningKey mPwd byronFormat convert
 
     firstExceptT ShelleyKeyCmdWriteFileError . newExceptT $
       writeFileTextEnvelope skeyPathNew Nothing sk'
-
-  where
-    -- TODO: merge these two types
-    toCarandoEra :: ByronKeyFormat -> CardanoEra
-    toCarandoEra NonLegacyByronKeyFormat = ByronEra
-    toCarandoEra LegacyByronKeyFormat    = ByronEraLegacy
-
 
 convertByronVerificationKey
   :: forall keyrole.
