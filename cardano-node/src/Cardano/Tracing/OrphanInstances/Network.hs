@@ -53,12 +53,18 @@ import           Ouroboros.Network.Subscription (ConnectResult (..), DnsTrace (.
 import           Ouroboros.Network.TxSubmission.Inbound (TraceTxSubmissionInbound (..))
 import           Ouroboros.Network.TxSubmission.Outbound (TraceTxSubmissionOutbound (..))
 
+import qualified Ouroboros.Network.Diffusion as ND
+
 {- HLINT ignore "Use record patterns" -}
 
 --
 -- * instances of @HasPrivacyAnnotation@ and @HasSeverityAnnotation@
 --
 -- NOTE: this list is sorted by the unqualified name of the outermost type.
+
+instance HasPrivacyAnnotation ND.DiffusionInitializationTracer
+instance HasSeverityAnnotation ND.DiffusionInitializationTracer where
+  getSeverityAnnotation _ = Info
 
 instance HasPrivacyAnnotation NtC.HandshakeTr
 instance HasSeverityAnnotation NtC.HandshakeTr where
@@ -288,6 +294,11 @@ instance HasSeverityAnnotation (WithMuxBearer peer MuxTrace) where
 --
 -- NOTE: this list is sorted by the unqualified name of the outermost type.
 
+instance Transformable Text IO ND.DiffusionInitializationTracer where
+  trTransformer = trStructuredText
+instance HasTextFormatter ND.DiffusionInitializationTracer where
+  formatText _ = pack . show . toList
+
 instance Transformable Text IO NtN.HandshakeTr where
   trTransformer = trStructuredText
 instance HasTextFormatter NtN.HandshakeTr where
@@ -465,6 +476,45 @@ instance ToObject (FetchDecision [Point header]) where
              , "length" .= String (pack $ show $ length results)
              ]
 
+instance ToObject ND.DiffusionInitializationTracer where
+  toObject _verb ND.DiffusionInitiatilizationRunServer = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationRunServer"
+    ]
+  toObject _verb (ND.DiffusionInitiatilizationCreatingLocalServerSocketForUnixPath path) = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationCreatingLocalServerSocketForUnixPath"
+    , "path" .= String (pack path)
+    ]
+
+  toObject _verb (ND.DiffusionInitiatilizationCreateLocalServerSocketForSnocketPath path) = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationCreateLocalServerSocketForSnocketPath"
+    , "path" .= String (pack path)
+    ]
+  toObject _verb (ND.DiffusionInitiatilizationCreatedLocalServerSocketForSnocketPath path) = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationCreatedLocalServerSocketForSnocketPath"
+    , "path" .= String (pack path)
+    ]
+  toObject _verb (ND.DiffusionInitiatilizationBindingToSocket path socket) = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationBindingToSocket"
+    , "path" .= String (pack path)
+    , "socket" .= String (pack socket)
+    ]
+  toObject _verb (ND.DiffusionInitiatilizationListeningToSocket path socket) = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationListeningToSocket"
+    , "path" .= String (pack path)
+    , "socket" .= String (pack socket)
+    ]
+  toObject _verb (ND.DiffusionInitiatilizationCreatingServerSocket socket) = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationCreatingServerSocket"
+    , "socket" .= String (pack (show socket))
+    ]
+  toObject _verb (ND.DiffusionInitiatilizationBindingServerSocket socket) = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationBindingServerSocket"
+    , "socket" .= String (pack (show socket))
+    ]
+  toObject _verb (ND.DiffusionInitiatilizationUnsupportedSocketType path) = mkObject
+    [ "kind" .= String "DiffusionInitiatilizationUnsupportedSocketType"
+    , "path" .= String (pack path)
+    ]
 
 instance ToObject NtC.HandshakeTr where
   toObject _verb (WithMuxBearer b ev) =

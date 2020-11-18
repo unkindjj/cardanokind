@@ -274,7 +274,7 @@ handleSimpleNode p trace nodeTracers nc onKernel = do
     , dtMuxLocalTracer = nullTracer
     , dtHandshakeTracer = handshakeTracer nodeTracers'
     , dtHandshakeLocalTracer = localHandshakeTracer nodeTracers'
-    , dtSocketTracer = textTracer nodeTracers'
+    , dtDiffusionInitializationTracer = diffusionInitializationTracer nodeTracers'
     }
 
   createTracers
