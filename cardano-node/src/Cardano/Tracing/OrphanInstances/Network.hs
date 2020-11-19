@@ -53,12 +53,18 @@ import           Ouroboros.Network.Subscription (ConnectResult (..), DnsTrace (.
 import           Ouroboros.Network.TxSubmission.Inbound (TraceTxSubmissionInbound (..))
 import           Ouroboros.Network.TxSubmission.Outbound (TraceTxSubmissionOutbound (..))
 
+import qualified Ouroboros.Network.Diffusion as ND
+
 {- HLINT ignore "Use record patterns" -}
 
 --
 -- * instances of @HasPrivacyAnnotation@ and @HasSeverityAnnotation@
 --
 -- NOTE: this list is sorted by the unqualified name of the outermost type.
+
+instance HasPrivacyAnnotation ND.DiffusionInitializationTracer
+instance HasSeverityAnnotation ND.DiffusionInitializationTracer where
+  getSeverityAnnotation _ = Info
 
 instance HasPrivacyAnnotation NtC.HandshakeTr
 instance HasSeverityAnnotation NtC.HandshakeTr where
@@ -288,6 +294,11 @@ instance HasSeverityAnnotation (WithMuxBearer peer MuxTrace) where
 --
 -- NOTE: this list is sorted by the unqualified name of the outermost type.
 
+instance Transformable Text IO ND.DiffusionInitializationTracer where
+  trTransformer = trStructuredText
+instance HasTextFormatter ND.DiffusionInitializationTracer where
+  formatText _ = pack . show . toList
+
 instance Transformable Text IO NtN.HandshakeTr where
   trTransformer = trStructuredText
 instance HasTextFormatter NtN.HandshakeTr where
@@ -465,6 +476,48 @@ instance ToObject (FetchDecision [Point header]) where
              , "length" .= String (pack $ show $ length results)
              ]
 
+instance ToObject ND.DiffusionInitializationTracer where
+  toObject _verb ND.RunServer = mkObject
+    [ "kind" .= String "RunServer"
+    ]
+  toObject _verb ND.RunLocalServer = mkObject
+    [ "kind" .= String "RunLocalServer"
+    ]
+  toObject _verb (ND.CreatingSystemdSocketForUnixPath path) = mkObject
+    [ "kind" .= String "CreatingSystemdSocketForUnixPath"
+    , "path" .= String (pack path)
+    ]
+
+  toObject _verb (ND.CreateSystemdSocketForSnocketPath path) = mkObject
+    [ "kind" .= String "CreateSystemdSocketForSnocketPath"
+    , "path" .= String (pack path)
+    ]
+  toObject _verb (ND.CreatedSystemdSocketForSnocketPath path) = mkObject
+    [ "kind" .= String "CreatedSystemdSocketForSnocketPath"
+    , "path" .= String (pack path)
+    ]
+  toObject _verb (ND.BindingToSocket path socket) = mkObject
+    [ "kind" .= String "BindingToSocket"
+    , "path" .= String (pack path)
+    , "socket" .= String (pack socket)
+    ]
+  toObject _verb (ND.ListeningToSocket path socket) = mkObject
+    [ "kind" .= String "ListeningToSocket"
+    , "path" .= String (pack path)
+    , "socket" .= String (pack socket)
+    ]
+  toObject _verb (ND.CreatingServerSocket socket) = mkObject
+    [ "kind" .= String "CreatingServerSocket"
+    , "socket" .= String (pack (show socket))
+    ]
+  toObject _verb (ND.BindingServerSocket socket) = mkObject
+    [ "kind" .= String "BindingServerSocket"
+    , "socket" .= String (pack (show socket))
+    ]
+  toObject _verb (ND.UnsupportedSystemdSocket path) = mkObject
+    [ "kind" .= String "UnsupportedSystemdSocket"
+    , "path" .= String (pack (show path))
+    ]
 
 instance ToObject NtC.HandshakeTr where
   toObject _verb (WithMuxBearer b ev) =
