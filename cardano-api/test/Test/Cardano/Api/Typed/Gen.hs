@@ -30,6 +30,7 @@ import           Cardano.Api.Typed
 import           Cardano.Prelude
 
 import           Control.Monad.Fail (fail)
+import qualified Data.Map.Strict as Map
 
 import qualified Cardano.Binary as CBOR
 import qualified Cardano.Crypto.Hash as Crypto
@@ -162,23 +163,32 @@ genAssetId :: Gen AssetId
 genAssetId = Gen.choice [ AssetId <$> genPolicyId <*> genAssetName
                         , return AdaAssetId
                         ]
+
 genQuantity :: Gen Quantity
 genQuantity =
-  fromInteger <$> Gen.integral_ (Range.exponential 0 (toInteger (maxBound :: Int64)))
+  fromInteger <$> Gen.integral_ (Range.exponential (negate 2) 2)
 
 genValue :: Gen Value
-genValue =
-  valueFromList <$> Gen.list (Range.constant 0 10) ((,)
-                <$> genAssetId <*> genQuantity)
+genValue = do
+  aId <- genAssetId
+  qs <- Gen.list (Range.constant 0 5) genQuantity
+  let duplicates = zip (repeat aId) qs
+      dupValues = valueFromList duplicates
+
+  mixedValues <- valueFromList <$> Gen.list (Range.constant 0 10) ((,)
+                               <$> genAssetId <*> genQuantity)
+
+  Gen.choice [ return $ dupValues <> mixedValues
+             , return dupValues
+             , return mixedValues
+             ]
+
 
 -- We do not generate duplicate keys as 'ValueNestedRep' is created via
 -- flattening a 'Map'
 genValueNestedRep :: Gen ValueNestedRep
 genValueNestedRep =
-  Gen.choice
-    [ ValueNestedRep <$> Gen.list (Range.singleton 1) genValueNestedBundle
-    , ValueNestedRep <$> sequenceA [genValueNestedBundle, genValueNestedBundleAda]
-    ]
+  ValueNestedRep <$> Gen.list (Range.constant 0 5) genValueNestedBundle
 
 genValueNestedBundle :: Gen ValueNestedBundle
 genValueNestedBundle =
@@ -190,10 +200,26 @@ genValueNestedBundleAda :: Gen ValueNestedBundle
 genValueNestedBundleAda = ValueNestedBundleAda <$> genQuantity
 
 genValueNestedBundleNonAda :: Gen ValueNestedBundle
-genValueNestedBundleNonAda =
-  ValueNestedBundle
-    <$> genPolicyId
-    <*> Gen.map (Range.singleton 1) ((,) <$> genAssetName <*> genQuantity)
+genValueNestedBundleNonAda = do
+  pId <- genPolicyId
+  aName <- genAssetName
+  qs <- Gen.list (Range.constant 0 5) genQuantity
+  let duplicatesList = zip (repeat aName) qs
+      duplicates = Map.fromList duplicatesList
+      dupNestedBundles = ValueNestedBundle pId duplicates
+
+  mixed <- ValueNestedBundle
+             <$> genPolicyId
+             <*> Gen.map (Range.singleton 1) ((,) <$> genAssetName <*> genQuantity)
+
+  m <- Gen.list (Range.constant 0 5) ((,) <$> genAssetName <*> genQuantity)
+  let dupAndMixed = Map.fromList $ duplicatesList ++ m
+      dupAndMixedNestedBundles = ValueNestedBundle pId dupAndMixed
+
+  Gen.choice [ return dupNestedBundles
+             , return mixed
+             , return dupAndMixedNestedBundles
+             ]
 
 genAllRequiredSig :: Gen (MultiSigScript ShelleyEra)
 genAllRequiredSig =

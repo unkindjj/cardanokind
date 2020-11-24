@@ -6,6 +6,7 @@ module Test.Cardano.Api.Typed.Value
 
 import           Cardano.Prelude
 import           Data.Aeson
+import qualified Data.Map.Strict as Map
 
 import           Cardano.Api.Typed
 
@@ -26,20 +27,56 @@ prop_roundtrip_Value_flatten_unflatten =
   property $ do v <- forAll genValue
                 valueFromNestedRep (valueToNestedRep v) === v
 
--- Note when going from ValueNestedRep -> Value (via fromValueNestedRep)
--- we merge maps, which combines all common keys. Therefore
--- we must generate an ValueNestedRep with no duplicate values.
--- Remember that Maps cannot have duplicate keys and therefore
--- we will never go from Value -> ValueNestedRep (via toValueNestedRep) to a
--- ValueNestedRep with duplicate values.
 prop_roundtrip_Value_unflatten_flatten :: Property
 prop_roundtrip_Value_unflatten_flatten =
     property $ do
       v <- forAll genValueNestedRep
-      let v' = valueToNestedRep (valueFromNestedRep v)
-      v `equiv` v'
-  where
-    equiv (ValueNestedRep a) (ValueNestedRep b) = sort a === sort b
+      canonicalise v === valueToNestedRep (valueFromNestedRep v)
+
+canonicalise :: ValueNestedRep -> ValueNestedRep
+canonicalise (ValueNestedRep bundles) =
+  ValueNestedRep $ mergeDuplicates bundles
+ where
+  mergeDuplicates :: [ValueNestedBundle] -> [ValueNestedBundle]
+  mergeDuplicates bundles' =
+    let cleanedBundles :: [ValueNestedBundle]
+        cleanedBundles = removeEmptyNestedBundles bundles'
+
+        folded :: (Quantity, [ValueNestedBundle])
+        folded = foldl
+                   (\(adaAcc, mintAcc) b ->
+                     case b of
+                       ValueNestedBundleAda q -> (adaAcc + q, mintAcc)
+                       ValueNestedBundle pid aMap -> (adaAcc, ValueNestedBundle pid aMap : mintAcc)
+                   )
+                   (0,[])
+                   cleanedBundles
+
+        summedAda = fst folded
+        summedMinted = snd folded
+
+    in if summedAda == 0
+       then sort summedMinted
+       else ValueNestedBundleAda summedAda : sort summedMinted
+
+  removeEmptyNestedBundles :: [ValueNestedBundle] -> [ValueNestedBundle]
+  removeEmptyNestedBundles [] = []
+  removeEmptyNestedBundles (vNb : rest) =
+    case vNb of
+      ValueNestedBundleAda v ->
+        if v == 0
+        then removeEmptyNestedBundles rest
+        else vNb : removeEmptyNestedBundles rest
+      ValueNestedBundle pid m ->
+        -- All AssetNames have 0 quantity in a given PolicyId
+        if all (\(_, quantity) -> quantity == 0) $ Map.toList m
+        then removeEmptyNestedBundles rest
+        else ValueNestedBundle pid (removeAssetWithZeroQuantity m) : removeEmptyNestedBundles rest
+
+  removeAssetWithZeroQuantity :: Map AssetName Quantity -> Map AssetName Quantity
+  removeAssetWithZeroQuantity m = Map.filter (\q -> q /= 0) m
+
+
 
 -- -----------------------------------------------------------------------------
 

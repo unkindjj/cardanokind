@@ -124,8 +124,8 @@ instance FromJSONKey AssetName where
   fromJSONKey = FromJSONKeyText (AssetName . Text.encodeUtf8)
 
 
-data AssetId = AssetId !PolicyId !AssetName
-             | AdaAssetId
+data AssetId = AdaAssetId
+             | AssetId !PolicyId !AssetName
   deriving (Eq, Ord, Show)
 
 newtype Value = Value (Map AssetId Quantity)
@@ -252,7 +252,7 @@ instance FromJSON ValueNestedRep where
       parsePid ("lovelace", q) = ValueNestedBundleAda <$> parseJSON q
       parsePid (pid, q) =
         case deserialiseFromRawBytesHex AsScriptHash (Text.encodeUtf8 pid) of
-          Just sHash -> ValueNestedBundle (PolicyId sHash) <$> (parseJSON q)
+          Just sHash -> ValueNestedBundle (PolicyId sHash) <$> parseJSON q
           Nothing -> fail $ "Failure when deserialising PolicyId: "
                          <> Text.unpack pid
 
