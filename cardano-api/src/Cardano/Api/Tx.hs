@@ -202,6 +202,14 @@ instance HasTypeProxy (Witness ShelleyEra) where
     data AsType (Witness ShelleyEra) = AsShelleyWitness
     proxyToAsType _ = AsShelleyWitness
 
+instance HasTypeProxy (Witness AllegraEra) where
+    data AsType (Witness AllegraEra) = AsAllegraWitness
+    proxyToAsType _ = AsAllegraWitness
+
+instance HasTypeProxy (Witness MaryEra) where
+    data AsType (Witness MaryEra) = AsMaryWitness
+    proxyToAsType _ = AsMaryWitness
+
 instance SerialiseAsCBOR (Witness ByronEra) where
     serialiseToCBOR (ByronKeyWitness wit) = CBOR.serialize' wit
 
@@ -248,11 +256,61 @@ instance SerialiseAsCBOR (Witness ShelleyEra) where
             _ -> CBOR.cborError $ CBOR.DecoderErrorUnknownTag
                                     "Shelley Witness" (fromIntegral t)
 
+instance SerialiseAsCBOR (Witness AllegraEra) where
+    serialiseToCBOR = CBOR.serializeEncoding' . encodeAllegraWitness
+      where
+        encodeAllegraWitness :: Witness AllegraEra -> CBOR.Encoding
+        encodeAllegraWitness (AllegraScriptwitness wit) =
+          CBOR.encodeListLen 2 <> CBOR.encodeWord 0 <> toCBOR wit
+
+    deserialiseFromCBOR AsAllegraWitness bs =
+        CBOR.decodeAnnotator
+          "Allegra Witness"
+          decodeAllegraWitness (LBS.fromStrict bs)
+      where
+        decodeAllegraWitness
+          :: CBOR.Decoder s (CBOR.Annotator (Witness AllegraEra))
+        decodeAllegraWitness = do
+          CBOR.decodeListLenOf 2
+          t <- CBOR.decodeWord
+          case t of
+            0 -> fmap (fmap AllegraScriptwitness) fromCBOR
+            _ -> CBOR.cborError $ CBOR.DecoderErrorUnknownTag
+                                    "Allegra Witness" (fromIntegral t)
+
+instance SerialiseAsCBOR (Witness MaryEra) where
+    serialiseToCBOR = CBOR.serializeEncoding' . encodeMaryWitness
+      where
+        encodeMaryWitness :: Witness MaryEra -> CBOR.Encoding
+        encodeMaryWitness (MaryScriptWitness wit) =
+          CBOR.encodeListLen 2 <> CBOR.encodeWord 0 <> toCBOR wit
+
+    deserialiseFromCBOR AsMaryWitness bs =
+        CBOR.decodeAnnotator
+          "Mary Witness"
+          decodeMaryWitness (LBS.fromStrict bs)
+      where
+        decodeMaryWitness
+          :: CBOR.Decoder s (CBOR.Annotator (Witness MaryEra))
+        decodeMaryWitness = do
+          CBOR.decodeListLenOf 2
+          t <- CBOR.decodeWord
+          case t of
+            0 -> fmap (fmap MaryScriptWitness) fromCBOR
+            _ -> CBOR.cborError $ CBOR.DecoderErrorUnknownTag
+                                    "Mary Witness" (fromIntegral t)
+
 instance HasTextEnvelope (Witness ByronEra) where
     textEnvelopeType _ = "TxWitnessByron"
 
 instance HasTextEnvelope (Witness ShelleyEra) where
     textEnvelopeType _ = "TxWitnessShelley"
+
+instance HasTextEnvelope (Witness AllegraEra) where
+    textEnvelopeType _ = "TxWitnessAllegra"
+
+instance HasTextEnvelope (Witness MaryEra) where
+    textEnvelopeType _ = "TxWitnessMary"
 
 
 getTxBody :: Tx era -> TxBody era
@@ -576,4 +634,3 @@ signShelleyTransaction txbody sks =
     makeSignedTransaction witnesses txbody
   where
     witnesses = map (makeShelleyKeyWitness txbody) sks
-
